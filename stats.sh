@@ -51,25 +51,27 @@ then
 			else 
 				cut -f $(($count+1)) $dataFilePath >> "$tempCol"
 			fi
-			count=$((count+1))  
-		done  
-		count2=0
+			count=$(($count+1))  	
+		done
 		cat $tempCol | tr '\n' '\t' > $tempRow
 		while read line
 		do 
+			median=0	
+			sum=0
+			count2=0
 			for enum in $line
 			do
 				numArray[count2]=$enum
 				sum=$(($sum + $enum))
 				count2=$(($count2 + 1)) 
 			done
-			sortedNumArray=($(for k in "${numArray[@]}"; do echo -e $k |sort -n))
-			average=$(($sum/$count))
+			sortedNumArray=($(for k in "${numArray[@]}"; do echo -e $k; done | sort -n))
+			average=$(($sum/$count2))
 			for sortedNumbers in "${sortedNumArray[@]}"
 			do
-				echo "$sortedNumbers"
-			done | sort -n > finalFile
-			median=${sortedNumArray[$((count2/2))]}
+				echo $sortedNumbers
+			done | sort -n
+			median=${sortedNumArray[$(($count2/2))]}
 			echo -e "Average: $average Median: $median"
 		done < "$tempRow"
 	done < "$dataFilePath"
