@@ -24,7 +24,7 @@ else
 	exit 1 #standard error and return 1 for too many arguments passed.
 fi
 
-trap "rm -rf ./dataFile$$ || true; echo 'Trapped a signal... Exiting.' exit 1;" IN HUP TERM #traps and terminates file storing stdin data if created.
+trap "rm -rf ./dataFile$$ || true; echo 'Trapped a signal... Exiting.' exit 1;" INT HUP TERM #traps and terminates file storing stdin data if created.
 
 if [[ $1 == -r* ]] #checks if the user wants the data sorted by rows.
 then
