@@ -1,0 +1,126 @@
+clear
+
+argumentCount="$#"
+transposeFile="transposeFile"
+#tempRow="./tempRow"
+#tempCol="./tempCol"
+
+
+if [ "$argumentCount" = "1" ] #checks if there was one argument passed.
+then
+	inputFile="./inputFile$$"
+	cat > "$inputFile" #adds the stdin data to be stored in datafile(process ID).
+elif [ "$argumentCount" = "2" ]  #checks if there were two arguments passed.
+then
+	if [ -s $2 ] #checks if files exists and has contents.
+	then
+		if [ -r $2 ] #checks if file is readable.
+		then
+			inputFile="./inputFile$$" #stores the input filepath argumment.
+			cp $2 $inputFile
+		else 
+			echo "ERROR: File was not readable." 1>&2
+			exit 1
+		fi
+	else 
+		echo "ERROR: File is empty or no readable." 1>&2 # write error message to stderror and exit with value of 1.
+		exit 1
+	fi
+else 
+	echo "ERROR: Invalid number of arguments." 1>&2 #write error message to 
+	exit 1 #standard error and return 1 for too many arguments passed.
+fi
+
+trap "rm -f $inputFile; echo 'Trapped a signal and Exiting.'; exit 1;" INT HUP TERM #traps and terminates file storing stdin data if created and unexpectedly quits.
+
+if [[ -s  $inputFile ]] #checks if file exists.
+then
+	if [[ $1 == -r* ]] #checks if user asked for row calculations.
+	then
+		echo "calculating row stats."
+		while read i #while not the end of the file, read the next row.
+		do
+			doubleAverageMod=0 #stores the left-over of average calculation to determine ropunding. 
+			median=0 #set median equal to 0
+			count=0 #set row number count to 0 for average.
+			sum=0 #set sum to 0 to be divided by count for average.
+			
+			for num in $i #for each number in each row i.
+			do	
+				numArray[count]=$(($num))
+				sum=$(($sum + $num)) #sum the rows
+				count=$(($count + 1)) #increment count
+			done
+			
+			sortedNumArray=($(printf "%s\n" "${numArray[@]}" | sort -n)) #interates through the array of row values, sorts them, and echoes them out into a new sorted array.
+			average=$(($sum / $count)) #at end of row, calculate average.
+			doubleAverageMod=$((($sum%$average)*2)) #calculate remainder of average calculation for rounding.
+			
+			if [ $doubleAverageMod -ge $count ] #check remainder -- increment if greater than or equal to half of the count.
+			then 
+				average=$(($average + 1)) #increment average.
+			fi
+	
+			median=${sortedNumArray[$(($count/2))]} #calculate median.
+			echo -e "Average: $average Median: $median " #print average and median for each row
+		
+		done < "$inputFile"
+
+		rm -f $inputFile
+
+	elif [[ $1 == -c* ]] #checks if the users wants the data sorted by columns.
+	then
+		tempCol="./tempCol$$" #create temp files for column and row for transposing
+		tempRow="./tempRow$$"
+		finalRow="./finalRow$$"
+		echo "calculating column stats."
+		count=0 #holds the number of values per row at the end of loop
+		
+		while read i
+		do 	
+			cut -f $(($count+1)) $inputFile | sort >> "$tempCol" #cuts the columns into tempCol and sorts them.
+			count=$(($count+1)) #increment counter.
+		done < $"$inputFile" #sends in the inputfile to the loop.
+		
+		cat $tempCol | tr '\n' '\t' > $tempRow #replaces newline chracters with tab characters to reformat into rows.
+		transposecounter=$(($count*2))
+		
+		sed -e "s/.\{$transposecounter\}/&\n/g" < $tempRow | cat >> "$finalRow" #cuts the tempRow by a certain number of characters stored in $transposeCounter and pipes it to the finalRow which is our final temp file.
+	
+		while read line 
+		do 	
+			#set variables for use in loop.
+			doubleAverageMod=0
+			count=0
+			median=0
+			average=0
+			sum=0
+		
+			for enum in $line #for every number in the finalRow file.
+			do 
+				sum=$(( $sum+$enum )) #calculates the sum
+				sortedNumArray[count]=$enum #adds the current number to the array for median calulation later.
+				count=$(( $count+1 )) #increment count
+			done
+			
+			average=$(($sum / $count)) #store the average value at the end of the row.
+			doubleAverageMod=$((($sum%$average)*2)) #calculate the remaining mod from average calculation.
+			if [ $doubleAverageMod -ge $count ] #check if twice the remaining mod is greater or equal to the count.
+			then 
+				average=$(($average+1)) #increment if twice remaining mod is greater than or equal to the counter.
+			fi
+			median=${sortedNumArray[$(($count/2))]} #store the median value.
+			echo "Average: $average Median: $median" #echo out the mean and median values. 
+	
+		done < "$finalRow" #send in final row temp file to loop.
+	
+		#delete temp files.
+		rm -f $tempCol 
+		rm -f $tempRow
+		rm -f $finalRow
+		rm -f $inputFile
+	else 
+		echo "ERROR: You did not validly ask for a row or column calculation." 1>&2
+		exit 1
+	fi
+fi
