@@ -1,7 +1,6 @@
 clear
 
 argumentCount="$#"
-transposeFile="transposeFile"
 #tempRow="./tempRow"
 #tempCol="./tempCol"
 
