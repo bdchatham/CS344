@@ -186,7 +186,7 @@ struct room** setupRooms(char** roomNames, int* randomIndices)
 
 		roomHolder[i]->numConnections = 0;
 
-		if(i == 2)
+		if(i == 0)
 			roomHolder[i]->roomType = "START_ROOM";
 		else if( i == 5)
 			roomHolder[i]->roomType = "END_ROOM";
@@ -278,8 +278,71 @@ void setRoomFilePointers(FILE** filePointers, struct room** gameRooms)
 	}
 }
 
+bool checkRoomType(struct room* currentRoom)
+{
+	if(strcmp(currentRoom->roomType, "END_ROOM") == 0)
+		return true;
+	else
+		return false; 
+}
+
+void readRoomFiles(char* directoryName, struct room** gameRooms)
+{
+	
+
+}
+
+void playGame(FILE** filePointers, struct room* currentRoom)
+{
+	//char** pathToVictory
+	int i;
+	char userResponse[30];
+	while(true)
+	{
+		printf("\n");
+		if(checkRoomType(currentRoom))
+		{
+			printf("YOU HAVE FOUND THE END ROOM. CONGRATULATIONS!");
+			//winning description.
+			break;
+		}
+		
+		printf("CURRENT LOCATION: %s\n", currentRoom->roomName);
+		printf("POSSIBLE CONNECTIONS: ");
+		
+		for(i = 0; i < currentRoom->numConnections; i++)
+		{
+			printf("%s", currentRoom->roomConnections[i]->roomName);
+			if(i+1 ==  currentRoom->numConnections)
+				printf(".\n");
+			else
+				printf(",");
+		}
+		
+		printf("WHERE TO?  ");
+		memset(userResponse, '\0', sizeof(userResponse));
+		scanf("%s", userResponse);
+		for(i = 0; i < currentRoom->numConnections; i++)
+		{
+			if(strcmp(userResponse, currentRoom->roomConnections[i]->roomName) == 0)
+			{
+				currentRoom = currentRoom->roomConnections[i];
+				break;
+			}
+			
+			if(i+1 == currentRoom->numConnections)
+			{
+				printf("\n");
+				printf("HUH? I DON'T UNDERSTAND THAT ROOM. TRY AGAIN.\n\n");
+			}
+		}
+
+	}
+}
+
 int main(int argc, char **argv)
 {
+	int i;
 	char* directoryName = spawnDirectory();
 	char** roomNames = generateRoomNames();
 	FILE** filePointers = createRoomFiles(directoryName);
@@ -288,6 +351,20 @@ int main(int argc, char **argv)
 	connectRooms(gameRooms, randomIndices);
 	setRoomFilePointers(filePointers, gameRooms);
 	prepareRooms(gameRooms);
+	for(i = 0; i < 7; i++)
+		fclose(filePointers[i]);
+	readRoomFiles(directoryName, gameRooms);
+	
+	struct room* startRoom = gameRooms[0];
+	
+		
+	playGame(filePointers, startRoom);
 	
 	return 0;
 }
+
+
+/*primary thread, lock mutex
+ * then 
+ *maybe use join
+ */
