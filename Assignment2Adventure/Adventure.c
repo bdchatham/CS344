@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 struct room
 {
@@ -153,21 +154,27 @@ FILE** createRoomFiles(char* directoryName)
 
 void prepareRooms(struct room** gameRooms)
 {
+	
 	int i, j;
+	
+	//Formats the room file for the room name.
 	for(i = 0; i < 7; i++)
 		fprintf(gameRooms[i]->fileHandle, "ROOM NAME: %s\n", gameRooms[i]->roomName);
 	
+	//Formats the room file for the room connections.
 	for(i = 0; i < 7; i++)
 	{
+		//While not the end of the room connection array.
 		while(gameRooms[i]->roomConnections[j] != NULL && j < gameRooms[i]->numConnections)
 		{
 			fprintf(gameRooms[i]->fileHandle, "CONNECTION %d: %s\n", j+1, gameRooms[i]->roomConnections[j]->roomName);
 			j++;
 		}
-	
+		//Reset j for looping.
 		j=0;
 	}
 	
+	//Formats the room file for the room type.
 	for(i = 0; i < 7; i++)
 		fprintf(gameRooms[i]->fileHandle, "ROOM TYPE: %s", gameRooms[i]->roomType);
 }
@@ -178,10 +185,13 @@ struct room** setupRooms(char** roomNames, int* randomIndices)
 	int i, j;
 	struct room** roomHolder = malloc(sizeof(struct room*) * 7);
 
+	//For each room that will go in the room holder array....
 	for(i = 0; i < 7; i++)
 	{
+		//Allocate memory for the rooms and set first member variables.
 		roomHolder[i] = malloc(sizeof(struct room));
 		roomHolder[i]->roomName = malloc(sizeof(char) * 30);
+		roomHolder[i]->roomType = malloc(sizeof(char) * 30);
 		strcpy(roomHolder[i]->roomName, roomNames[randomIndices[i]]);
 
 		roomHolder[i]->numConnections = 0;
@@ -193,11 +203,15 @@ struct room** setupRooms(char** roomNames, int* randomIndices)
 		else
 			roomHolder[i]->roomType = "MID_ROOM"; 
 		
+		//Allocates memory for pointers to other rooms. Maybe not necessary but wanted to be sure.
 		roomHolder[i]->roomConnections = malloc(sizeof(struct room) * 7);
+		
+		//Sets all connections to NULL to start.
 		for(j = 0; j < 7; j++)
 			roomHolder[i]->roomConnections[j] = NULL;	
 	}
 
+	//Return the rooms
 	return roomHolder;
 
 }
@@ -205,6 +219,8 @@ struct room** setupRooms(char** roomNames, int* randomIndices)
 int isGraphFull(struct room** gameRooms)
 {
 	int i;
+
+	//Return index of incomplete room if one exists, if not, return -1.
 	for(i = 0; i < 7; i++)
 	{
 		if(gameRooms[i]->numConnections < 4)
@@ -218,6 +234,7 @@ int isGraphFull(struct room** gameRooms)
 
 void connect(struct room* room1, struct room* room2)
 {
+	//Connect the rooms passed into function.
 	int i = 0;
 	while(room1->roomConnections[i] != NULL)
 		i++;
@@ -233,6 +250,7 @@ void connect(struct room* room1, struct room* room2)
 
 bool roomsAreNotConnected(struct room* room1, struct room* room2)
 {
+	//Iterate over the room connections and check if they are equal. 
 	int i = 0;
 	while((room1->roomConnections[i] != NULL) && (i < 7))
 	{
@@ -242,16 +260,20 @@ bool roomsAreNotConnected(struct room* room1, struct room* room2)
 			i++;
 	}
 	
+	//Returns true if the rooms were not found to be a match based on room name.
 	return true;
 }
 
 void addConnection(struct room* roomToAddTo, struct room** gameRooms)
 {
+	//Connects the two rooms once it is verified that they are not connected and they are not the same room. 
 	int randomIndex;
 	while(true)
 	{
 		srand(time(NULL));
 		randomIndex = rand()%7;
+		
+		//Checks if the rooms are not compatible.
 		if((gameRooms[randomIndex]->numConnections < 7) && (gameRooms[randomIndex] != roomToAddTo) && roomsAreNotConnected(gameRooms[randomIndex], roomToAddTo))
 		{	
 			connect(roomToAddTo, gameRooms[randomIndex]);
@@ -262,6 +284,7 @@ void addConnection(struct room* roomToAddTo, struct room** gameRooms)
 
 void connectRooms(struct room** gameRooms, int* randomIndices)
 {
+	//Checks if the graph is full and adds a connection to the returned index if it is not.
 	int i, j, roomIndex;
 	while((roomIndex = isGraphFull(gameRooms)) != -1)
 	{
@@ -274,12 +297,14 @@ void setRoomFilePointers(FILE** filePointers, struct room** gameRooms)
 	int i;
 	for(i = 0; i < 7; i++)
 	{
+		//Sets the file handle to the appropriate handle in the file pointer array.
 		gameRooms[i]->fileHandle = filePointers[i];
 	}
 }
 
 bool checkRoomType(struct room* currentRoom)
 {
+	//Checks if the room is the end room to end the game.
 	if(strcmp(currentRoom->roomType, "END_ROOM") == 0)
 		return true;
 	else
@@ -290,6 +315,7 @@ void readRoomFiles(char* directoryName, struct room** gameRooms)
 {
 	
 	//Could all probably be done in about 4 lines of a for-loop but won't try it unless I have time after I finish.
+	//Does the same thing for connecting to files as previously done except it is for reading only this time.
 	int i, j;
 	const char spaceDelimiter[2] = " ";
 	char* newLineRemover;
@@ -319,11 +345,16 @@ void readRoomFiles(char* directoryName, struct room** gameRooms)
 
 	for(i = 0; i < 7; i++)
 	{
+		//Clears the string and starts parsing through the file.
 		memset(inputFromFile, '\0', sizeof(inputFromFile));
-		fgets(inputFromFile, 30, gameRooms[i]->fileHandle);
+		fgets(inputFromFile, 29, gameRooms[i]->fileHandle);
+
+		//This little trick I found on stackoverflow to replace the endline character of the string with a null character for string comparisons.
 		newLineRemover = strchr(inputFromFile, '\n');
 		if(newLineRemover)
 			*newLineRemover = '\0';
+		
+		//Clears out the formatting and takes out the room name to restore it into the structure.
 		pertinentInfo = strtok(inputFromFile, spaceDelimiter);
 		pertinentInfo = strtok(NULL, spaceDelimiter);
 		pertinentInfo = strtok(NULL, spaceDelimiter);
@@ -333,40 +364,111 @@ void readRoomFiles(char* directoryName, struct room** gameRooms)
 		
 		for(j = 0; j < gameRooms[i]->numConnections; j++)
 		{
+			//Clears out the string again.
 			memset(inputFromFile, '\0', sizeof(inputFromFile));
-			fgets(inputFromFile, 30, gameRooms[i]->fileHandle);
+			fgets(inputFromFile, 29, gameRooms[i]->fileHandle);
+			//Same trick as before. 
+			printf("%s\n", inputFromFile);
 			newLineRemover = strchr(inputFromFile, '\n');
 			if(newLineRemover)
-				*newLineRemover = '\0';
+				*newLineRemover ='\0';
+			//clears out the formatting and takes out the room name from the room connection to store it back in the strcture.
 			pertinentInfo = strtok(inputFromFile, spaceDelimiter);
 			pertinentInfo = strtok(NULL, spaceDelimiter);
 			pertinentInfo = strtok(NULL, spaceDelimiter);
-	
-			//Copt the string read from the file into the room struct connection slot.
-			strcpy(gameRooms[i]->roomConnections[j]->roomName, pertinentInfo);	
 		}
-	
+
+		
+		memset(inputFromFile, '\0', sizeof(inputFromFile));
+		fgets(inputFromFile, 29, gameRooms[i]->fileHandle);
+		
+		newLineRemover = strchr(inputFromFile, '\n');
+		if(newLineRemover)
+			*newLineRemover = '\0';
+		pertinentInfo = strtok(inputFromFile, spaceDelimiter);
+		pertinentInfo = strtok(NULL, spaceDelimiter);
+                pertinentInfo = strtok(NULL, spaceDelimiter);
 	}
 }
 
+pthread_mutex_t mutex;
+
+void* writeTimeFile()
+{
+	//Writes the current time to a file called time.txt
+	time_t currTime;
+	currTime = time(NULL);
+	FILE* timeFile;
+	timeFile = fopen("time.txt", "w+");
+	fprintf(timeFile, "%s", ctime(&currTime));
+	fclose(timeFile);
+}
+
+void printTimeFile()
+{
+	//Create local varaibles.
+	FILE* fp;
+	char buffer[255];
+	memset(buffer, '\0', sizeof(buffer));
+	int c;
+	int pos = 0;
+
+	fp = fopen("time.txt", "r"); //open file
+	
+	do
+	{
+		c = fgetc(fp); //get a character from the file
+		
+		if (c != EOF) //if not end of file
+		{
+			buffer[pos] = (char)c;
+			pos++;
+		}
+	} while (c != EOF && c != '\n'); //reads one line
+	printf("\n\n");
+	printf("%s", buffer);
+
+	fclose(fp); //closes file pointer.
+}
+
+void threadTwo()
+{
+        pthread_t thread2;
+        pthread_mutex_init(&mutex, NULL);
+        pthread_mutex_lock(&mutex);
+        int threadID = pthread_create(&thread2, NULL, writeTimeFile, NULL);
+        pthread_mutex_unlock(&mutex);
+        pthread_mutex_destroy(&mutex);
+        sleep(1);
+}
+
+
+
 void  playGame(FILE** filePointers, struct room* currentRoom)
 {
-	//char** pathToVictory
+	char** pathToVictory = malloc(sizeof(char) * 10000);
+	memset(pathToVictory, '\0', sizeof(pathToVictory)); 
+	int stepCounter = 0;
 	int i;
 	char userResponse[30];
 	while(true)
 	{
+		//Formatting
 		printf("\n");
 		if(checkRoomType(currentRoom))
 		{
-			printf("YOU HAVE FOUND THE END ROOM. CONGRATULATIONS!");
-			//winning description.
+			printf("YOU HAVE FOUND THE END ROOM. CONGRATULATIONS!\n");
+			printf("YOU TOOK %d STEPS. YOUR PATH TO VICTORY WAS:\n", stepCounter);
+			for(i = 0; i < stepCounter; i++)
+				printf("%s\n", pathToVictory[i]);
 			break;
 		}
 		
+		//Write interface formatting.
 		printf("CURRENT LOCATION: %s\n", currentRoom->roomName);
 		printf("POSSIBLE CONNECTIONS: ");
 		
+		//Iterate over all of the connections the room has.
 		for(i = 0; i < currentRoom->numConnections; i++)
 		{
 			printf("%s", currentRoom->roomConnections[i]->roomName);
@@ -376,29 +478,39 @@ void  playGame(FILE** filePointers, struct room* currentRoom)
 				printf(", ");
 		}
 		
+		//Formatting
 		printf("WHERE TO?  ");
 		memset(userResponse, '\0', sizeof(userResponse));
 		scanf("%s", userResponse);
-		for(i = 0; i < currentRoom->numConnections; i++)
+		if(strcmp(userResponse,"time") == 0)
 		{
-			if(strcmp(userResponse, currentRoom->roomConnections[i]->roomName) == 0)
+			threadTwo();
+			printTimeFile();
+		}
+		else
+		{
+			for(i = 0; i < currentRoom->numConnections; i++)
 			{
-				currentRoom = currentRoom->roomConnections[i];
-				break;
-			}
-			
-			if(i+1 == currentRoom->numConnections)
-			{
-				printf("\n");
-				printf("HUH? I DON'T UNDERSTAND THAT ROOM. TRY AGAIN.\n\n");
+				if(strcmp(userResponse, currentRoom->roomConnections[i]->roomName) == 0)
+				{
+					pathToVictory[stepCounter++] = currentRoom->roomName;
+					currentRoom = currentRoom->roomConnections[i];
+					break;
+				}
+				
+				if(i+1 == currentRoom->numConnections)
+				{
+					printf("\n");
+					printf("HUH? I DON'T UNDERSTAND THAT ROOM. TRY AGAIN.\n\n");
+				}
 			}
 		}
-
-	}
+	}		
 }
 
 int main(int argc, char **argv)
 {
+	//Runs all of the functions in the appropriate order and starts up the game! Have fun :)
 	int i;
 	char* directoryName = spawnDirectory();
 	char** roomNames = generateRoomNames();
@@ -410,18 +522,15 @@ int main(int argc, char **argv)
 	prepareRooms(gameRooms);
 	for(i = 0; i < 7; i++)
 		fclose(filePointers[i]);
-	readRoomFiles(directoryName, gameRooms);
-	
+	//readRoomFiles(directoryName, gameRooms);
+	for(i = 0; i < 7; i++)
+		gameRooms[i]->fileHandle = NULL;
 	struct room* startRoom = gameRooms[0];
-	
-		
+			
 	playGame(filePointers, startRoom);
-	
+
 	return 0;
 }
 
 
-/*primary thread, lock mutex
- * then 
- *maybe use join
- */
+
