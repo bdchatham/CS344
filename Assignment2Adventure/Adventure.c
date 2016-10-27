@@ -289,10 +289,67 @@ bool checkRoomType(struct room* currentRoom)
 void readRoomFiles(char* directoryName, struct room** gameRooms)
 {
 	
+	//Could all probably be done in about 4 lines of a for-loop but won't try it unless I have time after I finish.
+	int i, j;
+	const char spaceDelimiter[2] = " ";
+	char* newLineRemover;
+	char* pertinentInfo;
+	char inputFromFile[30];
+	char filePath[30];
+       	snprintf(filePath, 29, "%s/%s", directoryName, "room1.txt");
+       	gameRooms[0]->fileHandle = fopen(filePath, "r");
+	
+        snprintf(filePath, 29, "%s/%s", directoryName, "room2.txt");
+        gameRooms[1]->fileHandle = fopen(filePath, "r");
 
+        snprintf(filePath, 29, "%s/%s", directoryName, "room3.txt");
+        gameRooms[2]->fileHandle = fopen(filePath, "r");
+	
+        snprintf(filePath, 29, "%s/%s", directoryName, "room4.txt");
+        gameRooms[3]->fileHandle = fopen(filePath, "r");
+
+        snprintf(filePath, 29, "%s/%s", directoryName, "room5.txt");
+        gameRooms[4]->fileHandle = fopen(filePath, "r");
+
+        snprintf(filePath, 29, "%s/%s", directoryName, "room6.txt");
+        gameRooms[5]->fileHandle = fopen(filePath, "r");
+	
+        snprintf(filePath, 29, "%s/%s", directoryName, "room7.txt");
+        gameRooms[6]->fileHandle = fopen(filePath, "r"); 
+
+	for(i = 0; i < 7; i++)
+	{
+		memset(inputFromFile, '\0', sizeof(inputFromFile));
+		fgets(inputFromFile, 30, gameRooms[i]->fileHandle);
+		newLineRemover = strchr(inputFromFile, '\n');
+		if(newLineRemover)
+			*newLineRemover = '\0';
+		pertinentInfo = strtok(inputFromFile, spaceDelimiter);
+		pertinentInfo = strtok(NULL, spaceDelimiter);
+		pertinentInfo = strtok(NULL, spaceDelimiter);
+		
+		//Copy the string read from the file into the room struct name.
+		strcpy(gameRooms[i]->roomName, pertinentInfo);
+		
+		for(j = 0; j < gameRooms[i]->numConnections; j++)
+		{
+			memset(inputFromFile, '\0', sizeof(inputFromFile));
+			fgets(inputFromFile, 30, gameRooms[i]->fileHandle);
+			newLineRemover = strchr(inputFromFile, '\n');
+			if(newLineRemover)
+				*newLineRemover = '\0';
+			pertinentInfo = strtok(inputFromFile, spaceDelimiter);
+			pertinentInfo = strtok(NULL, spaceDelimiter);
+			pertinentInfo = strtok(NULL, spaceDelimiter);
+	
+			//Copt the string read from the file into the room struct connection slot.
+			strcpy(gameRooms[i]->roomConnections[j]->roomName, pertinentInfo);	
+		}
+	
+	}
 }
 
-void playGame(FILE** filePointers, struct room* currentRoom)
+void  playGame(FILE** filePointers, struct room* currentRoom)
 {
 	//char** pathToVictory
 	int i;
@@ -316,7 +373,7 @@ void playGame(FILE** filePointers, struct room* currentRoom)
 			if(i+1 ==  currentRoom->numConnections)
 				printf(".\n");
 			else
-				printf(",");
+				printf(", ");
 		}
 		
 		printf("WHERE TO?  ");
