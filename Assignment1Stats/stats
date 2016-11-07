@@ -1,0 +1,120 @@
+#!/bin/bash
+
+#$set -x
+
+argumentCount="$#"
+
+if [ "$argumentCount" = "1" ] #checks if there was one argument passed.
+then
+	inputFile="./inputFile$$"
+	cat > "$inputFile" #adds the stdin data to be stored in datafile(process ID).
+elif [ "$argumentCount" = "2" ]  #checks if there were two arguments passed.
+then
+	if [ -s $2 ] #checks if files exists and has contents.
+	then
+		if [ -r $2 ] #checks if file is readable.
+		then
+			inputFile="./inputFile$$" #stores the input filepath argumment.
+			cp $2 $inputFile
+		else 
+			echo "ERROR: File was not readable." 1>&2
+			exit 1
+		fi
+	else 
+		echo "ERROR: File is empty or not readable." 1>&2 # write error message to stderror and exit with value of 1.
+		exit 1
+	fi
+else 
+	echo "Usage stats {-row|-col} [file]" 1>&2 #write error message to 
+	exit 1 #standard error and return 1 for too many arguments passed.
+fi
+
+trap "rm -f \"$inputFile\" \"$tempRow\"; echo 'Trapped a signal and Exiting.'; exit 1;" INT HUP TERM #traps and terminates file storing stdin data if created and unexpectedly quits.
+
+if [[ -s  $inputFile ]] #checks if file exists.
+then
+	if [[ $1 == -r* ]] #checks if user asked for row calculations.
+	then
+		echo -e "Average\tMedian"
+		while read line #while not the end of the file, read the next row.
+		do
+			count=$(echo "$line" | wc -w) #store the word count into count variable for the current line.
+			median=$(echo "$line" | tr '\t' '\n'  | sort -n | tr '\n' '\t' | cut -f $(((count/2+1)))) #flip the row into a line, sort it, then flip it back into a row and cut middle value which is the median.
+			sum=0 
+			average=0
+			for everyNumber in $line #for every number in the line.
+			do
+				sum=$(($sum + $everyNumber)) #sum all of the numbers in the line.
+			done
+			
+			if [ $sum -eq 0 ] #if the sum is equal to zero, the line is just a newline character and should be ignored.
+			then
+				break #breaks because it's the end of the file.
+			fi
+			
+			average=$(($sum / $count)) #calculate the average/
+			if [ $((($sum%$average)*2)) -ge $count ] #check if the average needs to be rounded up based on if the remainded is half or more of the count. 
+			then
+				((average++))
+			fi	
+			echo -e "$average\t$median " #print average and median for each row
+		
+		done < "$inputFile" #passes the input file to the loop.
+
+		rm -f "$inputFile" #removes the input file from the directory. 
+
+	elif [[ $1 == -c* ]] #checks if the users wants the data sorted by columns.
+	then
+		echo -e "Average\tMedian" #this section initializes all of the variables. 
+		columnNumber=1
+		tempRow="./tempRow$$"
+		while read line #while not the end of file.
+		do
+			for number in $line #for every number in the line 
+			do
+				cut -f $columnNumber $inputFile | sort -n | tr '\n' '\t' >> $tempRow #cut out the current column, sort it and flip it ino a row into the tempRow file. 
+				echo ""	>> $tempRow
+				((columnNumber++)) #increment to the next column. 
+			done
+			break #exit the loop because we only need to do this once. 
+		done <"$inputFile" #send the input file into the read loop.
+		
+		while read line 
+		do	
+			average=0 #section intiializes values. 
+			sum=0
+			count=$(echo "$line" | wc -w) #sets the count for number of values in the line. 
+			if [ $count -eq 0 ]
+			then
+				break #if the count is 0 then it's just a newline and the loop should exit.
+			fi
+			
+			median=$(echo "$line" | cut -f $(((count/2+1)))) #calculates the median from cutting the middle column from the line.
+			
+			for number in $line #for each number in the line.
+			do
+				sum=$(($sum+$number)) #add the current number to the line sum.
+			done
+			
+			average=$(($sum/$count)) #calculate the average.
+
+			if [ $((($sum%$average)*2)) -ge $count ] #check if the averagfe needs rounding determined by if twice the remainder is equal or greater than the count. 
+			then
+				((average++)) #increment the count.
+			fi
+			
+			echo -e "$average\t$median" #formatting.
+
+		done < $tempRow #send tempRow into the loop.
+		
+		rm -f "$tempRow" #remove the rempRow file.
+		rm -f "$inputFile" #remove the inputFile file.
+	else
+		rm -f "$inputFile" #only remove the inputFile because tempRow file was not created yet.
+		echo "Usage: stats {-rows|-cols} [file]" 1>&2
+		exit 1
+	fi
+else
+	echo "ERROR: File does not exist." 1>&2
+	exit 1
+fi
