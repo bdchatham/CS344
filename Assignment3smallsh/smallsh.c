@@ -8,14 +8,15 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+#define MAXNUMBEROFARGUMENTS 512
+#define MAXCOMMANDLENGTH 2048
+
 char* shReadInput()
 {
-	//Arbitrary buffer size that will be expanded if needed
-	int readBufferSize = 300;
 	//Position of reading input
 	int readingIndex = 0;
 	//Allocate memory for string in heap to pass back
-	char* shTempInput = malloc(sizeof(char) * readBufferSize);
+	char* shTempInput = malloc(sizeof(char) * MAXCOMMANDLENGTH);
 	//Variable for holding the character value in integer form because EOF is an int in the case that our argument is a file
 	int c;
 
@@ -26,7 +27,7 @@ char* shReadInput()
 	}
 	
 	//Loop until end of the input which will call a break
-	while(1)
+	while(readingIndex < MAXCOMMANDLENGTH)
 	{
 		//Read the current character
 		c = getchar();
@@ -42,18 +43,10 @@ char* shReadInput()
 			shTempInput[readingIndex] = c; 
 			readingIndex++;
 		}
-		
-		if(readingIndex == readBufferSize)
-		{
-			readBufferSize += readBufferSize;
-			shTempInput = realloc(shTempInput, readBufferSize);
-			if(!shTempInput)
-			{
-				fprintf(stderr, "Failed ro reallocate memory.\n");
-				exit(EXIT_FAILURE);
-			}
-		}
 	}
+
+	fprintf(stderr, "Command input too long.\n");
+	exit(EXIT_FAILURE);
 }
 
 char** shParseInput(char* userInput)
@@ -74,7 +67,7 @@ char** shParseInput(char* userInput)
 	
 	currentToken = strtok(userInput, tokenDelimiters);
 	
-	while(currentToken != NULL)
+	while(currentToken != NULL && tokenCount < MAXNUMBEROFARGUMENTS)
 	{
 		inputTokens[tokenCount] = currentToken;
 		tokenCount++;
@@ -97,6 +90,36 @@ char** shParseInput(char* userInput)
 	return inputTokens;
 }
 
+int shExecuteArguments(char** arguments)
+{
+	pid_t childPID, waitPID;
+	childPID = fork();
+	int status;
+	
+	if(childPID == 0)//Child Process. Run the arguments.
+	{
+		if(execvp(arguments[0], arguments) == -1)//Child did not properly execute program.
+		{
+			fprintf(stderr, "Error executing argument.\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if(childPID > 0)//Parent Process.
+	{
+		do
+		{
+			waitPID = waitpid(childPID, &status, WUNTRACED);	
+		}while(!WIFEXITED(status) && !WIFSIGNALED(status));//Waits for the child process until it exits or is killed by a signal.
+	}
+	else//Parent Process but child could not be created.
+	{
+		fprintf(stderr, "Error creating child process.\n.");
+		exit(EXIT_FAILURE);
+	}
+
+	exit(0);
+}
+
 void sh_loop()
 {
 	//Input text
@@ -104,14 +127,14 @@ void sh_loop()
 	//Array of arguments
 	char** arguments;
 	//Status of command
-	int status;
+	int status = 1;
 
 	do
 	{
-		printf("> ");
+		printf(": ");
 		input = shReadInput();
 		arguments = shParseInput(input);
-		//status = shExecuteArguments(arguments);
+		status = shExecuteArguments(arguments);
 
 		free(input);
 		free(arguments);
