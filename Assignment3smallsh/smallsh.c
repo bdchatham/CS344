@@ -8,16 +8,57 @@
 #include <stdbool.h>
 #include <pthread.h>
 
+/*
+ * Pre-defined shell interface limitations.
+ */
+
 #define MAXNUMBEROFARGUMENTS 512
 #define MAXCOMMANDLENGTH 2048
 
-char builtInCommands[] =
+/*
+ * Forward Declarations.
+ */ 
+
+void shLoop();
+char* shReadInput();
+char** shParseInput(char* userInput);
+int shChangeDirectory(char** arguments);
+int shHelp(char** arguments);
+int shStatus(char** arguments);
+int shExit(char** arguments);
+void shLoop();
+int shBuiltInFunctionListSize();
+int shExecuteArguments(char** arguments);
+int (*builtInFunctions[])(char** arguments);
+
+
+/*
+ * Strings of built-in command names.
+ */
+
+char *builtInCommands[] =
 {
 	"cd",
 	"help",
 	"status",
 	"exit"
 };
+
+/*
+ * Array of addresses to built-in functions. Must match the ordering of builtInCommand string list.
+ */
+
+int (*builtInFunctions[])(char**) =
+{
+	&shChangeDirectory,
+	&shHelp,
+	&shStatus,
+	&shExit
+};
+
+/*
+ * Reads input from user character by character and adds it to a character array to return.
+ */ 
 
 char* shReadInput()
 {
@@ -56,6 +97,35 @@ char* shReadInput()
 	fprintf(stderr, "Command input too long.\n");
 	exit(EXIT_FAILURE);
 }
+
+/*
+ * Prints out information on this shell.
+ */
+
+int shHelp(char** arguments)
+{	
+	int i;
+	printf("Brandon Chatham's shell. The following commands are supported by my implementations:\n");
+	for(i = 0; i < shBuiltInFunctionListSize(); i++)
+		printf("%s\n", builtInCommands[i]);
+	printf("Have fun!\n");	
+	
+	return 1;
+}
+
+/*
+ * Tells the user general information of the shell.
+ */
+
+int shStatus(char** arguments)
+{
+
+	return 1;
+}
+
+/*
+ * Parses the user input into individual arguments using strtok.
+ */
 
 char** shParseInput(char* userInput)
 {
@@ -98,6 +168,10 @@ char** shParseInput(char* userInput)
 	return inputTokens;
 }
 
+/*
+ * Changes to the directory with the name in the spot of the second argument if it exists. 
+ */ 
+
 int shChangeDirectory(char** arguments)
 {
 	if(arguments[1] == NULL )
@@ -113,10 +187,48 @@ int shChangeDirectory(char** arguments)
 	return 1;//Successfully completed cd command.
 }
 
-int shExit()
+/*
+ * Exit the shLoop by returning 0 to the status value. Exits the shell.
+ */
+
+int shExit(char** arguments)
 {
 	return 0;
 }
+
+/*
+ * Returns the number of pre-defined commands the shell supports.
+ */
+
+int shBuiltInFunctionListSize()
+{
+	return (sizeof(builtInCommands) / sizeof(char));//Returns the number of built-in functions the shell supports. 
+}
+
+/*
+ * Checks if commands given are supported. If they are, command is executed. If not, the shell is forked and a child process attempts to run the command. 
+ */
+
+int shExecuteArguments(char** arguments)
+{
+	int i;
+
+	if(arguments[0] == NULL)//No arguments found. Exit.
+		return(1);
+	
+	for(i = 0; i < shBuiltInFunctionListSize(); i++) 
+	{
+		if(strcmp(arguments[0], builtInCommands[i]) == 0)
+			return (*builtInFunctions[i])(arguments); 
+	}
+
+	return shLaunch(arguments);//Command is not supported by this shell. 
+	
+}
+
+/*
+ * Forks the process to run the given arguments if a child process is correctly created.
+ */
 
 int shLaunch(char** arguments)
 {
@@ -148,6 +260,10 @@ int shLaunch(char** arguments)
 	exit(0);
 }
 
+/*
+ * Main shell loop to call functions for user to interface with.
+ */
+
 void sh_loop()
 {
 	//Input text
@@ -162,7 +278,7 @@ void sh_loop()
 		printf(": ");
 		input = shReadInput();
 		arguments = shParseInput(input);
-		status = shLaunch(arguments);
+		status = shExecuteArguments(arguments);
 
 		free(input);
 		free(arguments);
@@ -173,8 +289,6 @@ int main(int argc, char** argv)
 {
 	//Shell loop
 	sh_loop();
-
-	exit(0);
 }
 
 
