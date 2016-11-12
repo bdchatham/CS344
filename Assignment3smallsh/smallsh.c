@@ -11,6 +11,14 @@
 #define MAXNUMBEROFARGUMENTS 512
 #define MAXCOMMANDLENGTH 2048
 
+char builtInCommands[] =
+{
+	"cd",
+	"help",
+	"status",
+	"exit"
+};
+
 char* shReadInput()
 {
 	//Position of reading input
@@ -90,7 +98,27 @@ char** shParseInput(char* userInput)
 	return inputTokens;
 }
 
-int shExecuteArguments(char** arguments)
+int shChangeDirectory(char** arguments)
+{
+	if(arguments[1] == NULL )
+	{
+		fprintf(stderr, "Expected additional argument for \"cd\" operation.\n");//Tells user they did not input enough arguments for cd command.
+	}
+	else 
+	{
+		if(chdir(arguments[1]) != 0)//Changes directories to the second argument. If fails error is reported.
+			perror("cd");//Send error info.
+	}
+
+	return 1;//Successfully completed cd command.
+}
+
+int shExit()
+{
+	return 0;
+}
+
+int shLaunch(char** arguments)
 {
 	pid_t childPID, waitPID;
 	childPID = fork();
@@ -134,7 +162,7 @@ void sh_loop()
 		printf(": ");
 		input = shReadInput();
 		arguments = shParseInput(input);
-		status = shExecuteArguments(arguments);
+		status = shLaunch(arguments);
 
 		free(input);
 		free(arguments);
