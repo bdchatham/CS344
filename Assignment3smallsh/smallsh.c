@@ -12,23 +12,67 @@
  * Pre-defined shell interface limitations.
  */
 
+#define MAXCHILDREN 20
 #define MAXNUMBEROFARGUMENTS 512
 #define MAXCOMMANDLENGTH 2048
+
+
+struct backgroundChildren
+{
+	pid_t* ids;
+	int mazSize;
+	int count;
+};
+
+/*
+ * Command info structure.
+ */
+
+struct CommandInfo
+{
+	int inStream;
+	int outStream;
+	char* outFileName;
+	char* inFileName;
+	bool isBackground;
+	int* backgroundChildren;
+	int childCount;
+};
+
+
+/*
+ * Command Info constructor.
+ */
+
+struct CommandInfo* CommandInfoInit()
+{
+	struct CommandInfo* ci;
+	ci = malloc(sizeof(struct CommandInfo));
+	ci->inStream = STDIN_FILENO;;
+	ci->outStream = STDOUT_FILENO;
+	ci->outFileName = NULL;
+	ci->inFileName = NULL;
+	ci->isBackground = false;
+	ci->backgroundChildren =  malloc(sizeof(int) * MAXCHILDREN);
+	ci->childCount = 0;
+
+	return ci;
+}
 
 /*
  * Forward Declarations.
  */ 
 
+int shLaunch(char** arguments, struct CommandInfo* ci);
 void shLoop();
 char* shReadInput();
-char** shParseInput(char* userInput);
+char** shParseInput(char* userInput, struct CommandInfo* ci);
 int shChangeDirectory(char** arguments);
 int shHelp(char** arguments);
 int shStatus(char** arguments);
 int shExit(char** arguments);
-void shLoop();
 int shBuiltInFunctionListSize();
-int shExecuteArguments(char** arguments);
+int shExecuteArguments(char** arguments, struct CommandInfo* ci);
 int (*builtInFunctions[])(char** arguments);
 
 
@@ -80,6 +124,7 @@ char* shReadInput()
 	{
 		//Read the current character
 		c = getchar();
+		fflush(stdout);
 		
 		//If eof or end of line
 		if(c == EOF || c == '\n')
@@ -106,9 +151,14 @@ int shHelp(char** arguments)
 {	
 	int i;
 	printf("Brandon Chatham's shell. The following commands are supported by my implementations:\n");
+	fflush(stdout);
 	for(i = 0; i < shBuiltInFunctionListSize(); i++)
+	{
 		printf("%s\n", builtInCommands[i]);
-	printf("Have fun!\n");	
+		fflush(stdout);
+	}
+	printf("Have fun!\n");
+	fflush(stdout);	
 	
 	return 1;
 }
@@ -119,7 +169,6 @@ int shHelp(char** arguments)
 
 int shStatus(char** arguments)
 {
-
 	return 1;
 }
 
@@ -127,13 +176,12 @@ int shStatus(char** arguments)
  * Parses the user input into individual arguments using strtok.
  */
 
-char** shParseInput(char* userInput)
+char** shParseInput(char* userInput, struct CommandInfo* ci)
 {
-	char* tokenDelimiters = " \t\r";
-	int tokenBufferSize = 50;
+	char* tokenDelimiters = " \n";
 	int tokenCount = 0;
 	
-	char** inputTokens = malloc(sizeof(char*) * tokenBufferSize);
+	char** inputTokens = malloc(sizeof(char*) * MAXNUMBEROFARGUMENTS);
 	
 	char* currentToken;
 
@@ -145,26 +193,34 @@ char** shParseInput(char* userInput)
 	
 	currentToken = strtok(userInput, tokenDelimiters);
 	
+	if(strncmp(currentToken, "#", 1) == 0)
+		return inputTokens;
+
 	while(currentToken != NULL && tokenCount < MAXNUMBEROFARGUMENTS)
 	{
-		inputTokens[tokenCount] = currentToken;
-		tokenCount++;
 
-		if(tokenCount > tokenBufferSize)
+		if(strcmp(currentToken, "<") == 0)
 		{
-			tokenBufferSize += tokenBufferSize;
-			inputTokens = realloc(inputTokens, tokenBufferSize);
-
-			if(!inputTokens)
-			{
-				fprintf(stderr, "Failled to reallocate memort for inputTokens.\n");
-				exit(EXIT_FAILURE);
-			}
+			currentToken = strtok(NULL, tokenDelimiters);
+			ci->inFileName = currentToken;
+			
 		}
-	
-		currentToken = strtok(NULL, tokenDelimiters);
-	}
+		else if(strcmp(currentToken, ">") == 0)
+		{
+			currentToken = strtok(NULL, tokenDelimiters);
+			ci->outFileName = currentToken;
+		}
+		else if(strcmp(currentToken, "&") == 0)
+		{
+			ci->isBackground = true;
+			break;
+		}
+		else
+			inputTokens[tokenCount++] = currentToken;	
 
+		currentToken = strtok(NULL, tokenDelimiters);	
+	}
+	
 	return inputTokens;
 }
 
@@ -174,14 +230,15 @@ char** shParseInput(char* userInput)
 
 int shChangeDirectory(char** arguments)
 {
-	if(arguments[1] == NULL )
+	char* destination = arguments[1];
+	if(destination == NULL)
 	{
-		fprintf(stderr, "Expected additional argument for \"cd\" operation.\n");//Tells user they did not input enough arguments for cd command.
+		destination = getenv("HOME");
 	}
-	else 
+	if(chdir(destination) == -1)//Changes directories to the second argument. If fails error is reported.
 	{
-		if(chdir(arguments[1]) != 0)//Changes directories to the second argument. If fails error is reported.
-			perror("cd");//Send error info.
+		perror("cd");//Send error info.
+		fflush(stdout);
 	}
 
 	return 1;//Successfully completed cd command.
@@ -202,14 +259,14 @@ int shExit(char** arguments)
 
 int shBuiltInFunctionListSize()
 {
-	return (sizeof(builtInCommands) / sizeof(char));//Returns the number of built-in functions the shell supports. 
+	return (sizeof(builtInCommands) / sizeof(char*));//Returns the number of built-in functions the shell supports. 
 }
 
 /*
  * Checks if commands given are supported. If they are, command is executed. If not, the shell is forked and a child process attempts to run the command. 
  */
 
-int shExecuteArguments(char** arguments)
+int shExecuteArguments(char** arguments, struct CommandInfo* ci)
 {
 	int i;
 
@@ -222,7 +279,7 @@ int shExecuteArguments(char** arguments)
 			return (*builtInFunctions[i])(arguments); 
 	}
 
-	return shLaunch(arguments);//Command is not supported by this shell. 
+	return shLaunch(arguments, ci);//Command is not supported by this shell. 
 	
 }
 
@@ -230,26 +287,63 @@ int shExecuteArguments(char** arguments)
  * Forks the process to run the given arguments if a child process is correctly created.
  */
 
-int shLaunch(char** arguments)
+int shLaunch(char** arguments, struct CommandInfo* ci)
 {
-	pid_t childPID, waitPID;
-	childPID = fork();
-	int status;
+	pid_t processID, waitPID;
+	int status = 0;
+	const char devNull[] = "/dev/null";
+
+	if(ci->inFileName == NULL && ci->isBackground) 
+		ci->inFileName = (char*)devNull;
 	
-	if(childPID == 0)//Child Process. Run the arguments.
-	{
+	if(ci->outFileName == NULL && ci->isBackground)
+		ci->outFileName = (char*)devNull;
+
+	processID = fork();
+
+	if(processID == 0)//Child process. Run the arguments.
+	{	
+		if(ci->inFileName != NULL)
+		{
+			ci->inStream = open(ci->inFileName, O_RDONLY);//Open the infile stream for reading from the specified path from the command.
+			if(ci->inStream == -1)
+			{
+				perror("inStream");
+				fflush(stdout);
+			}
+			else
+				dup2(ci->inStream, STDIN_FILENO);
+		}
+		
+		if(ci->outFileName != NULL)
+		{
+			ci->outStream = open(ci->outFileName, O_WRONLY);
+			if(ci->outStream == -1)
+			{
+				perror("outStream");
+				fflush(stdout);
+			}
+			else
+				dup2(ci->outStream, STDOUT_FILENO);
+		}
+		fflush(stdout);
 		if(execvp(arguments[0], arguments) == -1)//Child did not properly execute program.
 		{
 			fprintf(stderr, "Error executing argument.\n");
 			exit(EXIT_FAILURE);
 		}
 	}
-	else if(childPID > 0)//Parent Process.
+	else if(processID > 0)//Parent Process.
 	{
-		do
-		{
-			waitPID = waitpid(childPID, &status, WUNTRACED);	
-		}while(!WIFEXITED(status) && !WIFSIGNALED(status));//Waits for the child process until it exits or is killed by a signal.
+		if(!ci->isBackground)//Not a background process so we need to wait for it.
+		{	
+			do
+			{
+				waitPID = waitpid(processID, &status, WUNTRACED);	
+			}while(!WIFEXITED(status) && !WIFSIGNALED(status));//Waits for the child process until it exits or is killed by a signal.
+		}
+		else//Add the child to the list of children in ci.
+			ci->children[ci->childCount++] = processID; 
 	}
 	else//Parent Process but child could not be created.
 	{
@@ -257,7 +351,7 @@ int shLaunch(char** arguments)
 		exit(EXIT_FAILURE);
 	}
 
-	exit(0);
+	return(1);
 }
 
 /*
@@ -266,28 +360,36 @@ int shLaunch(char** arguments)
 
 void sh_loop()
 {
-	//Input text
+	//Create CommandInformation object.
+	struct CommandInfo* ci = CommandInfoInit();
+	//Input text.
 	char* input;
-	//Array of arguments
+	//Array of arguments.
 	char** arguments;
-	//Status of command
+	//Status of command.
 	int status = 1;
 
 	do
 	{
 		printf(": ");
+		fflush(stdout);
 		input = shReadInput();
-		arguments = shParseInput(input);
-		status = shExecuteArguments(arguments);
-
-		free(input);
-		free(arguments);
+		arguments = shParseInput(input, ci);
+		if(arguments[0] != NULL)
+			status = shExecuteArguments(arguments, ci);
+		memset(arguments, '\0', sizeof(arguments));
+		memset(input, '\0', sizeof(input));
+		ci->inFileName = NULL;
+		ci->outFileName = NULL;
+		ci->outStream = 0;
+		ci->inStream = 0;
+		ci->isBackground = false;
 	}while(status);
 }
 
 int main(int argc, char** argv)
 {
-	//Shell loop
+	//Shell loop.
 	sh_loop();
 }
 
