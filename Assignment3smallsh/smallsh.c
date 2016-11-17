@@ -54,8 +54,6 @@ struct CommandInfo
 	char* outFileName;
 	char* inFileName;
 	bool isBackground;
-	int* children;
-	int childCount;
 };
 
 
@@ -72,8 +70,6 @@ struct CommandInfo* CommandInfoInit()
 	ci->outFileName = NULL;
 	ci->inFileName = NULL;
 	ci->isBackground = false;
-	ci->children =  malloc(sizeof(int) * MAXCHILDREN);
-	ci->childCount = 0;
 
 	return ci;
 }
@@ -163,8 +159,8 @@ int shStatus(char** arguments)
 {
 	if(WIFEXITED(shellStatus))
 		printf("Exit status: %d.\n", WEXITSTATUS(shellStatus));
-	else
-	printf("Terminated by signal: %d. \n", shellStatus);
+	else if(WIFSIGNALED(shellStatus));
+		printf("Terminated by signal: %d. \n", shellStatus);
 
 	fflush(stdout);
 	
@@ -182,8 +178,10 @@ char** shParseInput(char* userInput, struct CommandInfo* ci)
 	char* tokenDelimiters = " \n";
 	int tokenCount = 0;
 	
+	//Allocate memory for the max number of arguments.
 	char** inputTokens = malloc(sizeof(char*) * MAXNUMBEROFARGUMENTS);
 	
+	//Current string value.
 	char* currentToken;
 
 	if(!inputTokens)
@@ -199,30 +197,30 @@ char** shParseInput(char* userInput, struct CommandInfo* ci)
 
 	while(currentToken != NULL && tokenCount < MAXNUMBEROFARGUMENTS)
 	{
-
-		if(strcmp(currentToken, "<") == 0)
+		
+		if(strcmp(currentToken, "<") == 0)//InFile located, store name in structure.
 		{
 			currentToken = strtok(NULL, tokenDelimiters);
 			ci->inFileName = currentToken;
 			
 		}
-		else if(strcmp(currentToken, ">") == 0)
+		else if(strcmp(currentToken, ">") == 0)//Outfile located, store name in structure.
 		{
 			currentToken = strtok(NULL, tokenDelimiters);
 			ci->outFileName = currentToken;
 		}
-		else if(strcmp(currentToken, "&") == 0)
+		else if(strcmp(currentToken, "&") == 0)//Background process, set flag.
 		{
 			ci->isBackground = true;
 			break;
 		}
 		else
-			inputTokens[tokenCount++] = currentToken;	
+			inputTokens[tokenCount++] = currentToken;//Store in arguments array.	
 
 		currentToken = strtok(NULL, tokenDelimiters);	
 	}
 	
-	return inputTokens;
+	return inputTokens;//Return arguments.
 }
 
 /*
@@ -234,7 +232,7 @@ int shChangeDirectory(char** arguments)
 	char* destination = arguments[1];
 	if(destination == NULL)
 	{
-		destination = getenv("HOME");
+		destination = getenv("HOME");//Sets destination to the root directory.
 	}
 	if(chdir(destination) == -1)//Changes directories to the second argument. If fails error is reported.
 	{
@@ -251,7 +249,7 @@ int shChangeDirectory(char** arguments)
 
 int shExit(char** arguments)
 {
-	return(0);
+	return(0);//Returns 0 to exit the shLoop.
 }
 
 /*
@@ -278,19 +276,19 @@ int shExecuteArguments(char** arguments, struct CommandInfo* ci, struct backgrou
 	}
 	for(i = 0; i < shBuiltInFunctionListSize(); i++) 
 	{
-		if(strcmp(arguments[0], builtInCommands[i]) == 0)
+		if(strcmp(arguments[0], builtInCommands[i]) == 0)//Checks to see if the given command is in the predefined function list.
 		{	if(strcmp(arguments[0], "exit") == 0)
 			{
 				for(j =0; j < bgc->count; j++)
-					kill(bgc->ids[j], SIGKILL);
-			}
-			return(*builtInFunctions[i])(arguments);
+					kill(bgc->ids[j], SIGKILL);//Exiting the program - kill all children lololololololol.
+			}	
 			shellStatus = 0;
+			return(*builtInFunctions[i])(arguments);//Return the return value of the built-in function.
 		} 
 	}
  
-	return shLaunch(arguments, ci, bgc, CtrlCStopper);//Command is not supported by this shell. 
 	shellStatus = 0;
+	return shLaunch(arguments, ci, bgc, CtrlCStopper);//Command is not supported by this shell. 
 }
 
 /*
@@ -304,13 +302,13 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 	int status = 0;
 	const char devNull[] = "/dev/null";
 
-	if(ci->inFileName == NULL && ci->isBackground) 
+	if(ci->inFileName == NULL && ci->isBackground)//Background process with no inFile. Set to dev null.
 		ci->inFileName = (char*)devNull;
 	
-	if(ci->outFileName == NULL && ci->isBackground)
+	if(ci->outFileName == NULL && ci->isBackground)//Background process with no outFile. Set to dev null.
 		ci->outFileName = (char*)devNull;
 
-	processID = fork();
+	processID = fork();//Fork process.
 
 	if(processID == 0)//Child process. Run the arguments.
 	{	
@@ -330,12 +328,12 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 				exit(1);
 			}
 			else
-				dup2(ci->inStream, STDIN_FILENO);
+				dup2(ci->inStream, STDIN_FILENO);//Copy the file stream to stdin to redirect input.
 		}
 		
 		if(ci->outFileName != NULL)
 		{
-			ci->outStream = open(ci->outFileName, O_WRONLY);
+			ci->outStream = open(ci->outFileName, O_WRONLY);//Open the outfile stream for writing from the specific path from the command.
 
 			if(ci->outStream == -1)
 			{
@@ -345,7 +343,7 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 				exit(1);
 			}
 			else
-				dup2(ci->outStream, STDOUT_FILENO);
+				dup2(ci->outStream, STDOUT_FILENO);//Copy the file stream to stdout to redirect output.
 		}
 		fflush(stdout);
 		if(execvp(arguments[0], arguments) == -1)//Child did not properly execute program.
@@ -371,7 +369,11 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 			shellStatus = status;
 		}
 		else//Add the child to the list of children in ci.
-			bgc->ids[bgc->count++] = processID; 
+		{
+			printf("Background process %d is being executed.\n", processID);
+			fflush(stdout);
+			bgc->ids[bgc->count++] = processID;//Adds the child to the array and increments ALL IN ONE LINE SO NIFTY.
+		}
 	}
 	else//Parent Process but child could not be created.
 	{
@@ -389,7 +391,7 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 
 void sh_loop(struct sigaction* CtrlCStopper)
 {
-	int i;
+	int i, exitValue;
 	//Create CommandInformation object.
 	struct CommandInfo* ci = CommandInfoInit();
 	//Create backgroundChildren object.
@@ -403,19 +405,22 @@ void sh_loop(struct sigaction* CtrlCStopper)
 	
 	do
 	{
-		printf(": ");
+		printf(": ");//Prompt for input.
 		fflush(stdout);
 		input = shReadInput();
-		arguments = shParseInput(input, ci);
+		arguments = shParseInput(input, ci);//Parse the input and set the structure flags and file specific information.
 		if(arguments[0] != NULL)
-			status = shExecuteArguments(arguments, ci, bgChildren, CtrlCStopper);
+			status = shExecuteArguments(arguments, ci, bgChildren, CtrlCStopper);//Execute the given argumemts.
+		//Clear the variables for input.
 		memset(arguments, '\0', sizeof(arguments));
 		memset(input, '\0', sizeof(input));
+		//Reset the structure values.
 		ci->inFileName = NULL;
 		ci->outFileName = NULL;
 		ci->outStream = 0;
 		ci->inStream = 0;
 		ci->isBackground = false;
+		//Check if background processes have exited or were terminated.
 		if(bgChildren->count > 0)
 		{
 			int exitValue;
@@ -424,12 +429,20 @@ void sh_loop(struct sigaction* CtrlCStopper)
 
 			if(waitPID != 0)
 			{
-				printf("Background process %d is completed with the exit value %d.\n", waitPID, exitValue);
-				fflush(stdout);
+				if(WIFEXITED(exitValue))//Process exited.
+				{
+					printf("Background process %d is completed with the exit value %d.\n", waitPID, WEXITSTATUS(exitValue));
+					fflush(stdout);
+				}
+				if(WIFSIGNALED(exitValue))
+				{
+					printf("Background process %d was terminated by signal %d.\n", waitPID, exitValue);
+					fflush(stdout);
+				}
 				//Removing child from array.
 				for(i = 0; i < bgChildren->count; i++)
 				{
-					if(bgChildren->ids[i] == waitPID)
+					if(bgChildren->ids[i] == waitPID)//This removes the child from the array by taking the value from the back and putting it into the removed spot, setting final value to 0, and decrement.
 					{
 						bgChildren->ids[i] = bgChildren->ids[bgChildren->count];
 						bgChildren->ids[bgChildren->count] = 0;
@@ -438,12 +451,12 @@ void sh_loop(struct sigaction* CtrlCStopper)
 				}
 			}
 		}
-	}while(status);
+	}while(status);//Check the return status - will only exit if exit is called and exit returns a value of 0.
 }
 
 int main(int argc, char** argv)
 {
-	struct sigaction* ctrlCStopper = malloc(sizeof(struct sigaction));
+	struct sigaction* ctrlCStopper = malloc(sizeof(struct sigaction));//Creates the struct for handling ctrl-c functionality.
 	ctrlCStopper->sa_handler = SIG_IGN;
 	sigaction(SIGINT, (&(*ctrlCStopper)), NULL);
 		
