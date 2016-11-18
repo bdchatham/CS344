@@ -17,7 +17,7 @@
 #define MAXCHILDREN 100
 #define MAXNUMBEROFARGUMENTS 512
 #define MAXCOMMANDLENGTH 2048
-int shellStatus = 0;
+int shellStatus = 1;
 
 /*
  * Background children.
@@ -39,7 +39,7 @@ struct backgroundChildren* backgroundChildrenInit()
 	struct backgroundChildren* bgc = malloc(sizeof(struct backgroundChildren));
 	bgc->maxSize = MAXCHILDREN;
 	bgc->count = 0;
-	bgc->ids = malloc(sizeof(int) * MAXCHILDREN);
+bgc->ids = malloc(sizeof(int) * MAXCHILDREN);
 	return bgc;
 }
 
@@ -158,7 +158,8 @@ char* shReadInput()
 int shStatus(char** arguments)
 {
 	if(WIFEXITED(shellStatus))
-		printf("Exit status: %d.\n", WEXITSTATUS(shellStatus));
+		printf("Exit status: %d.\n", shellStatus);
+
 	else if(WIFSIGNALED(shellStatus));
 		printf("Terminated by signal: %d. \n", shellStatus);
 
@@ -197,7 +198,6 @@ char** shParseInput(char* userInput, struct CommandInfo* ci)
 
 	while(currentToken != NULL && tokenCount < MAXNUMBEROFARGUMENTS)
 	{
-		
 		if(strcmp(currentToken, "<") == 0)//InFile located, store name in structure.
 		{
 			currentToken = strtok(NULL, tokenDelimiters);
@@ -272,7 +272,7 @@ int shExecuteArguments(char** arguments, struct CommandInfo* ci, struct backgrou
 	if(arguments[0] == NULL)//No arguments found. Exit.
 	{
 		shellStatus = 1;
-		return;
+		return 1;
 	}
 	for(i = 0; i < shBuiltInFunctionListSize(); i++) 
 	{
@@ -282,12 +282,12 @@ int shExecuteArguments(char** arguments, struct CommandInfo* ci, struct backgrou
 				for(j =0; j < bgc->count; j++)
 					kill(bgc->ids[j], SIGKILL);//Exiting the program - kill all children lololololololol.
 			}	
-			shellStatus = 0;
+			shellStatus = 1;
 			return(*builtInFunctions[i])(arguments);//Return the return value of the built-in function.
 		} 
 	}
  
-	shellStatus = 0;
+	shellStatus = 1;
 	return shLaunch(arguments, ci, bgc, CtrlCStopper);//Command is not supported by this shell. 
 }
 
@@ -298,7 +298,6 @@ int shExecuteArguments(char** arguments, struct CommandInfo* ci, struct backgrou
 int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren* bgc, struct sigaction* CtrlCStopper)
 {
 	pid_t processID, waitPID;
-	int sigNumber;
 	int status = 0;
 	const char devNull[] = "/dev/null";
 
@@ -351,6 +350,7 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 			fprintf(stderr, "Error executing argument.\n");
 			fflush(stdout);
 			shellStatus = 1;
+           		exit(EXIT_FAILURE);//Exit because execvp failed and therefore the program should stop.
 		}
 	}
 	else if(processID > 0)//Parent Process.
@@ -391,7 +391,7 @@ int shLaunch(char** arguments, struct CommandInfo* ci, struct backgroundChildren
 
 void sh_loop(struct sigaction* CtrlCStopper)
 {
-	int i, exitValue;
+	int i;
 	//Create CommandInformation object.
 	struct CommandInfo* ci = CommandInfoInit();
 	//Create backgroundChildren object.
@@ -412,8 +412,8 @@ void sh_loop(struct sigaction* CtrlCStopper)
 		if(arguments[0] != NULL)
 			status = shExecuteArguments(arguments, ci, bgChildren, CtrlCStopper);//Execute the given argumemts.
 		//Clear the variables for input.
-		memset(arguments, '\0', sizeof(arguments));
-		memset(input, '\0', sizeof(input));
+		memset(arguments, '\0', MAXNUMBEROFARGUMENTS);
+		memset(input, '\0', MAXCOMMANDLENGTH);
 		//Reset the structure values.
 		ci->inFileName = NULL;
 		ci->outFileName = NULL;
@@ -462,6 +462,7 @@ int main(int argc, char** argv)
 		
 	//Shell loop.
 	sh_loop(ctrlCStopper);
+    return 0;
 }
 
 
