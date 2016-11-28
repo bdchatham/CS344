@@ -19,9 +19,8 @@ int main(int argc, char *argv[])
 	int totlaBytes = 0;
 	int charCount = 0;
 	int connectionCount = 0;
-	char* encryptedMessage;
 	int currKey, currText;
-	int listenSocketFD, establishedConnectionFD, portNumber, charsRead, PID;
+	int listenSocketFD, establishedConnectionFD, portNumber, charsRead, PID, i;
 	socklen_t sizeOfClientInfo;
 	char textFile[MAXSIZE], key[MAXSIZE], encryptedMessage[MAXSIZE];
 	struct sockaddr_in serverAddress, clientAddress;
@@ -60,14 +59,14 @@ int main(int argc, char *argv[])
 	
 		if(PID == 0)//Child process. Get both files and do encryption.
 		{
-			write(socketFD, "opt_enc_d", 9);//Confirms appropriate connection.
+			write(establishedConnectionFD, "opt_enc_d", 9);//Confirms appropriate connection.
 
 			do
 			{
 				charCount = recv(establishedConnectionFD, textFile, MAXSIZE - 1, 0);
 				if(charCount < 0)
 				{
-					close(socketFD);
+					close(listenSocketFD);
 					error("ERROR on recv.");
 				}	
 		
@@ -82,13 +81,13 @@ int main(int argc, char *argv[])
 				charCount = recv(establishedConnectionFD, key, MAXSIZE - 1, 0);
 				if(charCount < 0)
 				{
-					close(socketFD);
+					close(listenSocketFD);
 					error("ERROR on recv.");
 				}	
 		
 				keyFileLength += charCount;
 			
-			}while(key[totalBytes] != '\0');	
+			}while(key[keyFileLength] != '\0');	
 	
 			charCount = write(establishedConnectionFD, "Success keyfile.", 16);
 		
@@ -128,16 +127,16 @@ int main(int argc, char *argv[])
 					encryptedMessage[i] = ' ';
 			}
 	
-			charCount = write(socketFD, encryptedMessage, textFileLength);
+			charCount = write(listenSocketFD, encryptedMessage, textFileLength);
 	
 			if(charCount < 0)
 				error("ERROR on encrypted write.");
 			
-			close(socketFD);
+			close(listenSocketFD);
 			close(establishedConnectionFD);
 		}
 		else	
-			close(socketFD); // Close the existing socket which is connected to the client.	
+			close(listenSocketFD); // Close the existing socket which is connected to the client.	
 	}
 	
 	return 0;
