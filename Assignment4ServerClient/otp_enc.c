@@ -6,16 +6,21 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <fnctl.h>
+#include <fcntl.h>
 #include <netdb.h>
+
+#define MAXSIZE 10000
 
 
 int main(int argc, char *argv[])
 {
-	int socketFD, portNumber, charsWritten, charsRead, fileSize;
+	char ch;
+	FILE *keyFD, *textFD; 
+	int i, keyFileSize, textFileSize;
+	int socketFD, portNumber, charsRead, fileSize, charsSent;
 	struct sockaddr_in serverAddress;
 	struct hostent* serverHostInfo;
-	char buffer[256];
+	char textFile[MAXSIZE], key[MAXSIZE], response[MAXSIZE], cipherText[MAXSIZE];
     
 	if (argc < 4) { fprintf(stderr,"USAGE: %s hostname port\n", argv[0]); exit(0); } // Check usage & args
 
@@ -24,9 +29,72 @@ int main(int argc, char *argv[])
 	portNumber = atoi(argv[3]); // Get the port number, convert to an integer from a string
 	serverAddress.sin_family = AF_INET; // Create a network-capable socket
 	serverAddress.sin_port = htons(portNumber); // Store the port number
-	serverHostInfo = gethostbyname(argv[1]); // Convert the machine name into a special form of address
+	serverHostInfo = gethostbyname("localhost"); // Convert the machine name into a special form of address
 	if (serverHostInfo == NULL) { fprintf(stderr, "CLIENT: ERROR, no such host\n"); exit(0); }
-	memcpy((char*)serverHostInfo->h_addr, (char*)&serverAddress.sin_addr.s_addr, serverHostInfo->h_length); // Copy in the address
+	memcpy((char*)&serverAddress.sin_addr.s_addr, (char*)serverHostInfo->h_addr, serverHostInfo->h_length); // Copy in the address
+	
+	//Read file information in.
+	textFD = fopen(argv[1], "r");
+	if(textFD < 0)
+	{
+		fprintf(stderr, "Failed to open text file.");
+		exit(1);
+	}
+	
+	keyFD = fopen(argv[2], "r");
+	if(keyFD < 0)
+	{
+		fprintf(stderr, "Failed to open key file");
+		exit(1);
+	}
+
+	i = 0;	
+	while((ch = getc(textFD)) != EOF )
+	{
+		if(ch == '\n')
+			break;
+		textFile[i++] = (char)ch;
+	}
+	textFile[i++] = '\0';
+	textFileSize = i;
+	
+	i = 0;
+	while((ch = getc(keyFD)) != EOF)
+	{
+		if(ch == '\n')
+			break;
+		key[i++] = (char)ch;
+	}
+	key[i++] = '\0';
+	keyFileSize = i;
+
+	if(keyFileSize < textFileSize)
+	{
+		fprintf(stderr, "Invalid filesizes.");
+		exit(1);
+	}
+	fclose(textFD);
+	fclose(keyFD);
+
+	//Validate file contents.
+	for(i = 0; i < textFileSize - 1; i++)
+	{
+		if((int)textFile[i] > 90 || (int)textFile[i] < 65 && (int)textFile[i] != 32)
+		{
+			fprintf(stderr, "Text file contains invalid characters.");
+			exit(1); 
+		}
+	}
+	
+	//Validate file contents.
+	for(i = 0; i < keyFileSize - 1; i++)
+	{
+		if((int)key[i] > 90 || (int)key[i] < 65 && (int)key[i] != 32)
+		{	
+			fprintf(stderr, "Key file contains invalid characters.");
+			exit(1);
+		}
+	}
 
 	// Set up the socket
 	socketFD = socket(AF_INET, SOCK_STREAM, 0); // Create the socket
@@ -34,24 +102,57 @@ int main(int argc, char *argv[])
 	
 	// Connect to server
 	if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) // Connect socket to address
-		error("CLIENT: ERROR connecting");
+		fprintf(stderr, "CLIENT: ERROR connecting.");
 
-	// Get input message from user
-	printf("CLIENT: Enter text to send to the server, and then hit enter: ");
-	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer array
-	fgets(buffer, sizeof(buffer) - 1, stdin); // Get input from the user, trunc to buffer - 1 chars, leaving \0
-	buffer[strcspn(buffer, "\n")] = '\0'; // Remove the trailing \n that fgets adds
+	//Response from server validating connection
+	memset(response, '\0', sizeof(response));
+	charsRead = recv(socketFD, response, sizeof(response) - 1, 0); 	
+	if(charsRead < 0)
+	{
+		fprintf(stderr, "Did not receive response from server.");
+		exit(2);
+	}
+	//Do a strcmp on response to check that the response was the correct server.
 
-	// Send message to server
-	charsWritten = send(socketFD, buffer, strlen(buffer), 0); // Write to the server
-	if (charsWritten < 0) error("CLIENT: ERROR writing to socket");
-	if (charsWritten < strlen(buffer)) printf("CLIENT: WARNING: Not all data written to socket!\n");
+	//Send the plaintext contents.	
+	charsSent = write(socketFD, textFile, strlen(textFile));
+	
+	if(charsSent < textFileSize - 1)
+	{
+		fprintf(stderr, "Not all of data written to server.");
+		exit(2);
+	}
 
-	// Get return message from server
-	memset(buffer, '\0', sizeof(buffer)); // Clear out the buffer again for reuse
-	charsRead = recv(socketFD, buffer, sizeof(buffer) - 1, 0); // Read data from the socket, leaving \0 at end
-	if (charsRead < 0) error("CLIENT: ERROR reading from socket");
-	printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
+	//Receive response from server before proceeding.
+	memset(response, '\0', sizeof(response));
+	charsRead = recv(socketFD, response, sizeof(response) -1, 0);
+
+	//Send the key contents.
+	charsSent = write(socketFD, key, strlen(key));
+	
+	if(charsSent < keyFileSize - 1)
+	{
+		fprintf(stderr, "Not all of data written to server.");
+		exit(2);
+	}
+
+	//Receive response from server before proceeding.
+	memset(response, '\0', sizeof(response));
+	charsRead = recv(socketFD, response, sizeof(response) - 1, 0);
+	
+	//Send reponse to make the server wait until ready for ciptertext transfer.
+	charsSent = write(socketFD, "otp_enc", 7);
+	
+	//Receive encrypted ciphertext.
+	memset(cipherText, '\0', sizeof(cipherText));
+
+	do
+	{
+		charsRead = recv(socketFD, cipherText, sizeof(cipherText) - 1, 0);
+	}
+	while(charsRead > 0);
+
+	printf("%s\n", cipherText);
 
 	close(socketFD); // Close the socket
 	return 0;

@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define MAXSIZE 1000
+#define MAXSIZE 10000
 
 void error(const char *msg) { perror(msg); exit(1); } // Error function used for reporting issues
 void readFile(int socketFD, char* fileContents);
@@ -16,13 +16,12 @@ int main(int argc, char *argv[])
 {
 	int textFileLength = 0;
 	int keyFileLength = 0;
-	int totlaBytes = 0;
 	int charCount = 0;
 	int connectionCount = 0;
 	int currKey, currText;
 	int listenSocketFD, establishedConnectionFD, portNumber, charsRead, PID, i;
 	socklen_t sizeOfClientInfo;
-	char textFile[MAXSIZE], key[MAXSIZE], encryptedMessage[MAXSIZE];
+	char textFile[MAXSIZE], key[MAXSIZE], encryptedMessage[MAXSIZE], response[15];
 	struct sockaddr_in serverAddress, clientAddress;
 
 	if (argc < 2) { fprintf(stderr,"USAGE: %s port\n", argv[0]); exit(1); } // Check usage & args
@@ -43,16 +42,17 @@ int main(int argc, char *argv[])
 		error("ERROR on binding");
 	listen(listenSocketFD, 5); // Flip the socket on - it can now receive up to 5 connections
 	
-	while(connectionCount < 10)
+	while(1)
 	{
+		printf("SERVER: trying to connect.\n");
 		// Accept a connection, blocking if one is not available until one connects
 		sizeOfClientInfo = sizeof(clientAddress); // Get the size of the address for the client that will connect
 		establishedConnectionFD = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); // Accept
-		connectionCount++;
-		
+		printf("SERVER: Server is connected.\n");
 		if (establishedConnectionFD < 0) error("ERROR on accept");
 		
 		PID = fork();
+
 		
 		if(PID < 0)
 			error("ERROR on forking");
@@ -69,7 +69,9 @@ int main(int argc, char *argv[])
 					close(listenSocketFD);
 					error("ERROR on recv.");
 				}	
-		
+				
+				//printf("current textfile data:%s.\n", textFile);//For Debugging
+				
 				textFileLength += charCount;
 			
 			}while(textFile[textFileLength] != '\0');	
@@ -84,34 +86,24 @@ int main(int argc, char *argv[])
 					close(listenSocketFD);
 					error("ERROR on recv.");
 				}	
+				
+				//printf("current keyfile data:%s.\n", key);//For Debugging
 		
 				keyFileLength += charCount;
 			
 			}while(key[keyFileLength] != '\0');	
 	
 			charCount = write(establishedConnectionFD, "Success keyfile.", 16);
+			
+			//Wait for response before sending the ciphertext.
+			memset(response, '\0', sizeof(response));
+			charCount = recv(establishedConnectionFD, response, sizeof(response) - 1, 0);
 		
-		
-			if(keyFileLength != textFileLength)
-				error("Non-matching file sizes.");
-
-			//validate plaintext file contents.
+			memset(encryptedMessage, '\0', sizeof(response));	
+			//Encrypt the message here.
 			for(i = 0; i < textFileLength; i++)
 			{
-				if((int)textFile[i] < 65 || (int)textFile[i] > 90 && (int)textFile[i] != 32)
-					error("Invalid textfile characters.");
-			}
-			
-			//validate key file contents.
-			for(i = 0; i < keyFileLength; i++)
-			{
-				if((int)key[i] < 65 || (int)key[i] > 90 && (int)key[i] != 32)
-					error("Invalid keyfile characters.");
-			}
-			
-				//Encrypt the message here.
-			for(i = 0; i < textFileLength; i++)
-			{
+				
 				//Handle spaces for the integer value conversions.
 				if(textFile[i] == ' ')
 					textFile[i] = '@';
@@ -122,22 +114,24 @@ int main(int argc, char *argv[])
 				currKey = (int)key[i] - 64;
 	
 				encryptedMessage[i] =(char)(((currText + currKey) % 27) + 64);
-				
-				if(encryptedMessage[i] = '@')
+				//printf("Curr encryptMessage char:%c\n", encryptedMessage[i]);//For Debugging
+				if(encryptedMessage[i] == '@')
 					encryptedMessage[i] = ' ';
 			}
-	
-			charCount = write(listenSocketFD, encryptedMessage, textFileLength);
+			
+			charCount = write(establishedConnectionFD, encryptedMessage, strlen(encryptedMessage));
 	
 			if(charCount < 0)
 				error("ERROR on encrypted write.");
 			
 			close(listenSocketFD);
 			close(establishedConnectionFD);
+
+			exit(0);
 		}
 		else	
-			close(listenSocketFD); // Close the existing socket which is connected to the client.	
+			close(establishedConnectionFD); // Close the existing socket which is connected to the client.	
 	}
-	
+		
 	return 0;
 }		
