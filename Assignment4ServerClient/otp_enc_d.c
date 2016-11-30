@@ -44,11 +44,9 @@ int main(int argc, char *argv[])
 	
 	while(1)
 	{
-		printf("SERVER: trying to connect.\n");
 		// Accept a connection, blocking if one is not available until one connects
 		sizeOfClientInfo = sizeof(clientAddress); // Get the size of the address for the client that will connect
 		establishedConnectionFD = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); // Accept
-		printf("SERVER: Server is connected.\n");
 		if (establishedConnectionFD < 0) error("ERROR on accept");
 		
 		PID = fork();
