@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 
-#define MAXSIZE 10000
+#define MAXSIZE 100000
 
 
 int main(int argc, char *argv[])
@@ -33,6 +33,13 @@ int main(int argc, char *argv[])
 	if (serverHostInfo == NULL) { fprintf(stderr, "CLIENT: ERROR, no such host\n"); exit(0); }
 	memcpy((char*)&serverAddress.sin_addr.s_addr, (char*)serverHostInfo->h_addr, serverHostInfo->h_length); // Copy in the address
 	
+	//Validate port range.
+	if(portNumber < 0 || portNumber > 65535)
+	{
+		fprintf(stderr, "Port invalid.\n");
+		exit(2);
+	}
+	
 	//Read file information in.
 	textFD = fopen(argv[1], "r");
 	if(textFD < 0)
@@ -48,6 +55,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	//Read the file character by character.
 	i = 0;	
 	while((ch = getc(textFD)) != EOF )
 	{
@@ -59,6 +67,8 @@ int main(int argc, char *argv[])
 	textFileSize = i;
 	
 	i = 0;
+
+	//Read the file character by character.
 	while((ch = getc(keyFD)) != EOF)
 	{
 		if(ch == '\n')
@@ -110,9 +120,17 @@ int main(int argc, char *argv[])
 	if(charsRead < 0)
 	{
 		fprintf(stderr, "Did not receive response from server.");
-		exit(2);
+		exit(1);
 	}
+	
 	//Do a strcmp on response to check that the response was the correct server.
+	if(strstr(response, "otp_enc_d") == NULL)
+	{
+		strcpy(textFile, "NULL\0");
+		charsSent = write(socketFD, textFile, strlen(textFile));
+		fprintf(stderr, "Connected to incorrect server.\n");
+		exit(1);
+	}
 
 	//Send the plaintext contents.	
 	charsSent = write(socketFD, textFile, strlen(textFile));
@@ -120,7 +138,7 @@ int main(int argc, char *argv[])
 	if(charsSent < textFileSize - 1)
 	{
 		fprintf(stderr, "Not all of data written to server.");
-		exit(2);
+		exit(1);
 	}
 
 	//Receive response from server before proceeding.
@@ -133,7 +151,7 @@ int main(int argc, char *argv[])
 	if(charsSent < keyFileSize - 1)
 	{
 		fprintf(stderr, "Not all of data written to server.");
-		exit(2);
+		exit(1);
 	}
 
 	//Receive response from server before proceeding.
@@ -148,7 +166,7 @@ int main(int argc, char *argv[])
 
 	do
 	{
-		charsRead = recv(socketFD, cipherText, sizeof(cipherText) - 1, 0);
+		charsRead = recv(socketFD, cipherText, sizeof(cipherText) - 1, 0);//Receives the cyphertext from the daemon and prints it.
 	}
 	while(charsRead > 0);
 

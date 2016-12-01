@@ -9,18 +9,18 @@
 #include <fcntl.h>
 #include <netdb.h>
 
-#define MAXSIZE 10000
+#define MAXSIZE 100000
 
 
 int main(int argc, char *argv[])
 {
 	char ch;
 	FILE *keyFD, *textFD; 
-	int i, keyFileSize, textFileSize;
+	int i, keyFileSize, encodedSize;
 	int socketFD, portNumber, charsRead, fileSize, charsSent;
 	struct sockaddr_in serverAddress;
 	struct hostent* serverHostInfo;
-	char textFile[MAXSIZE], key[MAXSIZE], response[MAXSIZE], cipherText[MAXSIZE];
+	char encodedText[MAXSIZE], key[MAXSIZE], response[MAXSIZE], plainText[MAXSIZE];
     
 	if (argc < 4) { fprintf(stderr,"USAGE: %s hostname port\n", argv[0]); exit(0); } // Check usage & args
 
@@ -32,6 +32,13 @@ int main(int argc, char *argv[])
 	serverHostInfo = gethostbyname("localhost"); // Convert the machine name into a special form of address
 	if (serverHostInfo == NULL) { fprintf(stderr, "CLIENT: ERROR, no such host\n"); exit(0); }
 	memcpy((char*)&serverAddress.sin_addr.s_addr, (char*)serverHostInfo->h_addr, serverHostInfo->h_length); // Copy in the address
+	
+	//Validate port number.
+	if(portNumber < 0 || portNumber > 65535)
+	{
+		fprintf(stderr, "Port Invalid.\n");
+		exit(2);
+	}
 	
 	//Read file information in.
 	textFD = fopen(argv[1], "r");
@@ -49,15 +56,18 @@ int main(int argc, char *argv[])
 	}
 
 	i = 0;	
+
+	//Read the file character by character.
 	while((ch = getc(textFD)) != EOF )
 	{
 		if(ch == '\n')
 			break;
-		textFile[i++] = (char)ch;
+		encodedText[i++] = (char)ch;
 	}
-	textFile[i++] = '\0';
-	textFileSize = i;
+	encodedText[i++] = '\0';
+	encodedSize = i;
 	
+	//Read the file character by character.
 	i = 0;
 	while((ch = getc(keyFD)) != EOF)
 	{
@@ -68,7 +78,7 @@ int main(int argc, char *argv[])
 	key[i++] = '\0';
 	keyFileSize = i;
 
-	if(keyFileSize < textFileSize)
+	if(keyFileSize < encodedSize)
 	{
 		fprintf(stderr, "Invalid filesizes.");
 		exit(1);
@@ -77,9 +87,9 @@ int main(int argc, char *argv[])
 	fclose(keyFD);
 
 	//Validate file contents.
-	for(i = 0; i < textFileSize - 1; i++)
+	for(i = 0; i < encodedSize - 1; i++)
 	{
-		if((int)textFile[i] > 90 || (int)textFile[i] < 65 && (int)textFile[i] != 32)
+		if((int)encodedText[i] > 90 || (int)encodedText[i] < 65 && (int)encodedText[i] != 32)
 		{
 			fprintf(stderr, "Text file contains invalid characters.");
 			exit(1); 
@@ -110,17 +120,24 @@ int main(int argc, char *argv[])
 	if(charsRead < 0)
 	{
 		fprintf(stderr, "Did not receive response from server.");
-		exit(2);
+		exit(1);
 	}
 	//Do a strcmp on response to check that the response was the correct server.
-
-	//Send the plaintext contents.	
-	charsSent = write(socketFD, textFile, strlen(textFile));
+	if(strstr(response, "otp_dec_d") == NULL)
+	{
+		strcmp(encodedText, "NULL\0");
+		charsSent = write(socketFD, encodedText, strlen(encodedText));
+		fprintf(stderr, "Connected to incorrect server.");
+		exit(1);
+	}
 	
-	if(charsSent < textFileSize - 1)
+	//Send the plaintext contents.	
+	charsSent = write(socketFD, encodedText, strlen(encodedText));
+	
+	if(charsSent < encodedSize - 1)
 	{
 		fprintf(stderr, "Not all of data written to server.");
-		exit(2);
+		exit(1);
 	}
 
 	//Receive response from server before proceeding.
@@ -133,7 +150,7 @@ int main(int argc, char *argv[])
 	if(charsSent < keyFileSize - 1)
 	{
 		fprintf(stderr, "Not all of data written to server.");
-		exit(2);
+		exit(1);
 	}
 
 	//Receive response from server before proceeding.
@@ -144,15 +161,15 @@ int main(int argc, char *argv[])
 	charsSent = write(socketFD, "otp_enc", 7);
 	
 	//Receive encrypted ciphertext.
-	memset(cipherText, '\0', sizeof(cipherText));
+	memset(plainText, '\0', sizeof(plainText));
 
 	do
 	{
-		charsRead = recv(socketFD, cipherText, sizeof(cipherText) - 1, 0);
+		charsRead = recv(socketFD, plainText, sizeof(plainText) - 1, 0);//Reads teh plaintext from the daemon and prints it.
 	}
 	while(charsRead > 0);
 
-	printf("%s\n", cipherText);
+	printf("%s\n", plainText);
 
 	close(socketFD); // Close the socket
 	return 0;

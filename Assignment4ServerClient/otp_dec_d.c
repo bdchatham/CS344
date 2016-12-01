@@ -14,14 +14,14 @@ void encryptMessage(char* textFile, char* key, char* encryptedMessage);
 
 int main(int argc, char *argv[])
 {
-	int textFileLength = 0;
+	int encodedMessageLength = 0;
 	int keyFileLength = 0;
 	int charCount = 0;
 	int connectionCount = 0;
 	int currKey, currText;
 	int listenSocketFD, establishedConnectionFD, portNumber, charsRead, PID, i;
 	socklen_t sizeOfClientInfo;
-	char textFile[MAXSIZE], key[MAXSIZE], encryptedMessage[MAXSIZE], response[15];
+	char encodedMessage[MAXSIZE], key[MAXSIZE], decryptedMessage[MAXSIZE], response[15];
 	struct sockaddr_in serverAddress, clientAddress;
 
 	if (argc < 2) { fprintf(stderr,"USAGE: %s port\n", argv[0]); exit(1); } // Check usage & args
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 
 		if (establishedConnectionFD < 0) error("ERROR on accept");
 		
-		PID = fork();
+		PID = fork();//Fork for concurrency.
 
 		
 		if(PID < 0)
@@ -58,28 +58,35 @@ int main(int argc, char *argv[])
 	
 		if(PID == 0)//Child process. Get both files and do encryption.
 		{
-			write(establishedConnectionFD, "opt_enc_d", 9);//Confirms appropriate connection.
+			write(establishedConnectionFD, "otp_dec_d", 9);//Confirms appropriate connection.
 
 			do
 			{
-				charCount = recv(establishedConnectionFD, textFile, MAXSIZE - 1, 0);
+				charCount = recv(establishedConnectionFD, encodedMessage, MAXSIZE - 1, 0);
+				
+				if(strstr(encodedMessage, "NULL") != NULL)//Check if the reponse contained a failure message signalling to discontinue the connection.
+				{
+					fprintf(stderr, "Connected to incorrect server.\n");
+					exit(1);
+				}
+
 				if(charCount < 0)
 				{
 					close(listenSocketFD);
-					error("ERROR on recv.");
+					error("ERROR on rec");
 				}	
 				
 				//printf("current textfile data:%s.\n", textFile);//For Debugging
 				
-				textFileLength += charCount;
+				encodedMessageLength += charCount;
 			
-			}while(textFile[textFileLength] != '\0');	
+			}while(encodedMessage[encodedMessageLength] != '\0');	
 
-			charCount = write(establishedConnectionFD, "Success textfile.", 17);
+			charCount = write(establishedConnectionFD, "Success textfile.", 17);//Respond to stop the hang on the other end.
 		
 			do
 			{
-				charCount = recv(establishedConnectionFD, key, MAXSIZE - 1, 0);
+				charCount = recv(establishedConnectionFD, key, MAXSIZE - 1, 0);//Read in the key.
 				if(charCount < 0)
 				{
 					close(listenSocketFD);
@@ -92,34 +99,34 @@ int main(int argc, char *argv[])
 			
 			}while(key[keyFileLength] != '\0');	
 	
-			charCount = write(establishedConnectionFD, "Success keyfile.", 16);
+			charCount = write(establishedConnectionFD, "Success keyfile.", 16);//Respond to stop the hang on the other end.
 			
 			//Wait for response before sending the ciphertext.
 			memset(response, '\0', sizeof(response));
-			charCount = recv(establishedConnectionFD, response, sizeof(response) - 1, 0);
+			charCount = recv(establishedConnectionFD, response, sizeof(response) - 1, 0);//Stop hanging and start decrypting.
 		
-			memset(encryptedMessage, '\0', sizeof(response));	
+			memset(decryptedMessage, '\0', sizeof(response));	
 			//Encrypt the message here.
-			for(i = 0; i < textFileLength; i++)
+			for(i = 0; i < encodedMessageLength; i++)
 			{
 				
 				//Handle spaces for the integer value conversions.
-				if(textFile[i] == ' ')
-					textFile[i] = '@';
+				if(encodedMessage[i] == ' ')
+					encodedMessage[i] = '@';
 				if(key[i] == ' ')
 					key[i] = '@';
 	
-				currText = (int)textFile[i] - 64;
+				currText = (int)encodedMessage[i] - 64;
 				currKey = (int)key[i] - 64;
 				if((currText -= currKey) < 0)
 					currText += 27;
-				encryptedMessage[i] =(char)(currText + 64);
+				decryptedMessage[i] =(char)(currText + 64);
 				//printf("Curr encryptMessage char:%c\n", encryptedMessage[i]);//For Debugging
-				if(encryptedMessage[i] == '@')
-					encryptedMessage[i] = ' ';
+				if(decryptedMessage[i] == '@')
+					decryptedMessage[i] = ' ';
 			}
 			
-			charCount = write(establishedConnectionFD, encryptedMessage, strlen(encryptedMessage));
+			charCount = write(establishedConnectionFD, decryptedMessage, strlen(decryptedMessage));//Send the decrypted message to the client.
 	
 			if(charCount < 0)
 				error("ERROR on encrypted write.");

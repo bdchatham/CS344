@@ -1,0 +1,152 @@
+#Initializing - Cleaning up - ignore Operation Not Permitted errors
+
+#-----------------------------------------
+#START OF GRADING SCRIPT
+#keygen 20 > key20
+#5 POINTS: key20 must exist
+key20 exists!
+
+#-----------------------------------------
+#5 POINTS: Number of characters in key20, should be 21:
+21 key20
+
+#-----------------------------------------
+#keygen 70000 > key70000
+#5 POINTS: Number of characters in key70000, should be 70001:
+70001 key70000
+
+#-----------------------------------------
+#otp_enc plaintext1 key20 $encport
+#10 POINTS: Should return error about too-short key
+Invalid filesizes.
+#-----------------------------------------
+#otp_enc plaintext1 key70000 $encport
+#20 POINTS: Should return encrypted version of plaintext1
+DTORNJQLLAANHXKTRVY EDTWBOTS DJUPT Y
+
+#-----------------------------------------
+#otp_enc plaintext1 key70000 $encport > ciphertext1
+#10 POINTS: ciphertext1 must exist
+ciphertext1 exists!
+
+#-----------------------------------------
+#10 POINTS: ciphertext1 must be same number of chars as source
+#wc -m plaintext1
+37 plaintext1
+#Should be same: wc -m ciphertext1
+37 ciphertext1
+
+#-----------------------------------------
+#5 POINTS: ciphertext1 should look encrypted
+DTORNJQLLAANHXKTRVY EDTWBOTS DJUPT Y
+
+#-----------------------------------------
+#otp_dec ciphertext1 key70000 $encport
+#5 POINTS: Should fail giving error that otp_dec cannot use otp_enc_d
+Connected to incorrect server.ERROR on recv.: Connection reset by peer
+
+#-----------------------------------------
+#20 POINTS: should return decrypted ciphertext1 that matches source
+#cat plaintext1
+THE RED GOOSE FLIES AT MIDNIGHT STOP
+#otp_dec ciphertext1 key70000 $decport
+
+
+#-----------------------------------------
+#otp_dec ciphertext1 key70000 $decport > plaintext1_a
+#10 POINTS: plaintext1_a must exist
+plaintext1_a exists!
+
+#-----------------------------------------
+#cmp plaintext1 plaintext1_a
+#5 POINTS: plaintext1 must be the same as plaintext1_a:
+plaintext1 plaintext1_a differ: byte 1, line 1
+#echo $? should be == 0, which means the cmp succeeded!
+0
+
+#-----------------------------------------
+#20 POINTS: concurrent test of encryption - look for 4 properly-sized ciphertext# files, or 5 where the 5th is 0 bytes
+#5 POINTS: Should be only one error about plaintext5 being bad
+Ten second sleep, your program must complete in this time
+Connected to incorrect server.
+Text file contains invalid characters.total 184
+drwxr-xr-x. 1 chathamb upg61878   952 Nov 30 15:46 ./
+drwxr-xr-x. 1 chathamb upg61878   932 Nov 23 13:57 ../
+-rwxr-xr-x. 1 chathamb upg61878    37 Nov 30 15:46 ciphertext1
+-rwxr-xr-x. 1 chathamb upg61878     1 Nov 30 15:46 ciphertext2
+-rwxr-xr-x. 1 chathamb upg61878    17 Nov 30 15:46 ciphertext3
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 ciphertext4
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 ciphertext5
+-rwxr-xr-x. 1 chathamb upg61878  2607 Nov 23 14:54 client.c
+-rwxr-xr-x. 1 chathamb upg61878   124 Nov 30 12:26 compileall
+-rwxr-xr-x. 1 chathamb upg61878    21 Nov 30 15:46 key20
+-rwxr-xr-x. 1 chathamb upg61878 70001 Nov 30 15:46 key70000
+-rwxr-xr-x. 1 chathamb upg61878  8863 Nov 24 15:31 keygen
+-rwxr-xr-x. 1 chathamb upg61878   559 Nov 24 15:31 keygen.c
+-rwxr-xr-x. 1 chathamb upg61878  1025 Nov 28 23:33 mykey
+-rwxr-xr-x. 1 chathamb upg61878  2416 Nov 30 15:46 mytestresults
+-rwxr-xr-x. 1 chathamb upg61878 13632 Nov 30 15:45 otp_dec
+-rwxr-xr-x. 1 chathamb upg61878  4563 Nov 30 15:23 otp_dec.c
+-rwxr-xr-x. 1 chathamb upg61878 13499 Nov 30 15:45 otp_dec_d
+-rwxr-xr-x. 1 chathamb upg61878  4570 Nov 30 15:45 otp_dec_d.c
+-rwxr-xr-x. 1 chathamb upg61878 13632 Nov 30 15:45 otp_enc
+-rwxr-xr-x. 1 chathamb upg61878  4543 Nov 30 15:26 otp_enc.c
+-rwxr-xr-x. 1 chathamb upg61878 13499 Nov 30 15:45 otp_enc_d
+-rwxrwx---. 1 chathamb upg61878  4476 Nov 30 15:16 otp_enc_d.c
+-rwxr-xr-x. 1 chathamb upg61878 13343 Nov 28 13:56 otp_end_d
+-rwxr-xr-x. 1 chathamb upg61878  4987 Nov 30 14:29 p4gradingscript
+-rwxr-xr-x. 1 chathamb upg61878    37 Nov 24 14:45 plaintext1
+-rwxr-xr-x. 1 chathamb upg61878   317 Nov 24 14:45 plaintext2
+-rwxr-xr-x. 1 chathamb upg61878    17 Nov 24 14:45 plaintext3
+-rwxr-xr-x. 1 chathamb upg61878 69333 Nov 24 14:45 plaintext4
+-rwxr-xr-x. 1 chathamb upg61878    42 Nov 24 14:45 plaintext5
+-rwxr-xr-x. 1 chathamb upg61878  2515 Nov 23 14:54 server.c
+
+#-----------------------------------------
+#15 POINTS: concurrent test of decryption - look for 4 plaintext#_a files that match the plaintext# files
+#Ten second sleep, your program must complete in this time
+total 188
+drwxr-xr-x. 1 chathamb upg61878   952 Nov 30 15:46 ./
+drwxr-xr-x. 1 chathamb upg61878   932 Nov 23 13:57 ../
+-rwxr-xr-x. 1 chathamb upg61878    37 Nov 30 15:46 ciphertext1
+-rwxr-xr-x. 1 chathamb upg61878     1 Nov 30 15:46 ciphertext2
+-rwxr-xr-x. 1 chathamb upg61878    17 Nov 30 15:46 ciphertext3
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 ciphertext4
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 ciphertext5
+-rwxr-xr-x. 1 chathamb upg61878  2607 Nov 23 14:54 client.c
+-rwxr-xr-x. 1 chathamb upg61878   124 Nov 30 12:26 compileall
+-rwxr-xr-x. 1 chathamb upg61878    21 Nov 30 15:46 key20
+-rwxr-xr-x. 1 chathamb upg61878 70001 Nov 30 15:46 key70000
+-rwxr-xr-x. 1 chathamb upg61878  8863 Nov 24 15:31 keygen
+-rwxr-xr-x. 1 chathamb upg61878   559 Nov 24 15:31 keygen.c
+-rwxr-xr-x. 1 chathamb upg61878  1025 Nov 28 23:33 mykey
+-rwxr-xr-x. 1 chathamb upg61878  4524 Nov 30 15:46 mytestresults
+-rwxr-xr-x. 1 chathamb upg61878 13632 Nov 30 15:45 otp_dec
+-rwxr-xr-x. 1 chathamb upg61878  4563 Nov 30 15:23 otp_dec.c
+-rwxr-xr-x. 1 chathamb upg61878 13499 Nov 30 15:45 otp_dec_d
+-rwxr-xr-x. 1 chathamb upg61878  4570 Nov 30 15:45 otp_dec_d.c
+-rwxr-xr-x. 1 chathamb upg61878 13632 Nov 30 15:45 otp_enc
+-rwxr-xr-x. 1 chathamb upg61878  4543 Nov 30 15:26 otp_enc.c
+-rwxr-xr-x. 1 chathamb upg61878 13499 Nov 30 15:45 otp_enc_d
+-rwxrwx---. 1 chathamb upg61878  4476 Nov 30 15:16 otp_enc_d.c
+-rwxr-xr-x. 1 chathamb upg61878 13343 Nov 28 13:56 otp_end_d
+-rwxr-xr-x. 1 chathamb upg61878  4987 Nov 30 14:29 p4gradingscript
+-rwxr-xr-x. 1 chathamb upg61878    37 Nov 24 14:45 plaintext1
+-rwxr-xr-x. 1 chathamb upg61878     1 Nov 30 15:46 plaintext1_a
+-rwxr-xr-x. 1 chathamb upg61878   317 Nov 24 14:45 plaintext2
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 plaintext2_a
+-rwxr-xr-x. 1 chathamb upg61878    17 Nov 24 14:45 plaintext3
+-rwxr-xr-x. 1 chathamb upg61878     1 Nov 30 15:46 plaintext3_a
+-rwxr-xr-x. 1 chathamb upg61878 69333 Nov 24 14:45 plaintext4
+-rwxr-xr-x. 1 chathamb upg61878     0 Nov 30 15:46 plaintext4_a
+-rwxr-xr-x. 1 chathamb upg61878    42 Nov 24 14:45 plaintext5
+-rwxr-xr-x. 1 chathamb upg61878  2515 Nov 23 14:54 server.c
+
+#-----------------------------------------
+#Cleaning up - ignore Operation Not Permitted errors
+./p4gradingscript: line 136: 20893 Terminated              otp_enc_d $encport
+./p4gradingscript: line 136: 20894 Terminated              otp_dec_d $decport
+./p4gradingscript: line 136: 21008 Terminated              otp_dec ciphertext2 key70000 $decport > plaintext2_a
+./p4gradingscript: line 136: 21010 Terminated              otp_dec ciphertext4 key70000 $decport > plaintext4_a
+
+#SCRIPT COMPLETE

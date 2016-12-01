@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#define MAXSIZE 10000
+#define MAXSIZE 100000
 
 void error(const char *msg) { perror(msg); exit(1); } // Error function used for reporting issues
 void readFile(int socketFD, char* fileContents);
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		establishedConnectionFD = accept(listenSocketFD, (struct sockaddr *)&clientAddress, &sizeOfClientInfo); // Accept
 		if (establishedConnectionFD < 0) error("ERROR on accept");
 		
-		PID = fork();
+		PID = fork();//Fork for concurrency.
 
 		
 		if(PID < 0)
@@ -57,11 +57,18 @@ int main(int argc, char *argv[])
 	
 		if(PID == 0)//Child process. Get both files and do encryption.
 		{
-			write(establishedConnectionFD, "opt_enc_d", 9);//Confirms appropriate connection.
+			write(establishedConnectionFD, "otp_enc_d", 9);//Confirms appropriate connection.
 
 			do
 			{
 				charCount = recv(establishedConnectionFD, textFile, MAXSIZE - 1, 0);
+				
+				if(strstr(textFile, "NULL") != NULL)//Check to see if the response contains a terminating signal.
+				{
+					fprintf(stderr, "Connected to incorrect server.\n");
+					exit(1);
+				}
+				
 				if(charCount < 0)
 				{
 					close(listenSocketFD);
@@ -78,7 +85,7 @@ int main(int argc, char *argv[])
 		
 			do
 			{
-				charCount = recv(establishedConnectionFD, key, MAXSIZE - 1, 0);
+				charCount = recv(establishedConnectionFD, key, MAXSIZE - 1, 0);//Read in the key.
 				if(charCount < 0)
 				{
 					close(listenSocketFD);
@@ -91,13 +98,13 @@ int main(int argc, char *argv[])
 			
 			}while(key[keyFileLength] != '\0');	
 	
-			charCount = write(establishedConnectionFD, "Success keyfile.", 16);
+			charCount = write(establishedConnectionFD, "Success keyfile.", 16);//Send a response to stop the hang.
 			
 			//Wait for response before sending the ciphertext.
 			memset(response, '\0', sizeof(response));
-			charCount = recv(establishedConnectionFD, response, sizeof(response) - 1, 0);
+			charCount = recv(establishedConnectionFD, response, sizeof(response) - 1, 0);//Read in the response to stop the hang.
 		
-			memset(encryptedMessage, '\0', sizeof(response));	
+			memset(encryptedMessage, '\0', sizeof(response));//Begin encrypting the message.
 			//Encrypt the message here.
 			for(i = 0; i < textFileLength; i++)
 			{
@@ -117,7 +124,7 @@ int main(int argc, char *argv[])
 					encryptedMessage[i] = ' ';
 			}
 			
-			charCount = write(establishedConnectionFD, encryptedMessage, strlen(encryptedMessage));
+			charCount = write(establishedConnectionFD, encryptedMessage, strlen(encryptedMessage));//Send the encrypted message.
 	
 			if(charCount < 0)
 				error("ERROR on encrypted write.");
